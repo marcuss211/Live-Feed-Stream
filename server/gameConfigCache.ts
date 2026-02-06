@@ -88,11 +88,20 @@ const PRAGMATIC_LADDER_GAMES = new Set([
   "Fruit Party", "Gates of Gatotkaca", "Buffalo King Megaways",
 ]);
 
+const DEFAULT_ACTIVE_GAMES = new Set([
+  "Gates of Olympus", "Sweet Bonanza", "Big Bass Bonanza",
+  "Sugar Rush", "Starlight Princess", "The Dog House", "Fruit Party",
+]);
+
 let cachedConfig: CachedConfig | null = null;
 
-function parseCustomLadder(raw: string | null): number[] | null {
+export function parseCustomLadder(raw: string | null): number[] | null {
   if (!raw || raw.trim() === "") return null;
-  const vals = raw.split(",").map(v => Number(v.trim())).filter(v => !isNaN(v) && v > 0);
+  let cleaned = raw.trim();
+  if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+    cleaned = cleaned.slice(1, -1);
+  }
+  const vals = cleaned.split(",").map(v => Number(v.trim())).filter(v => !isNaN(v) && v > 0);
   return vals.length > 0 ? vals.sort((a, b) => a - b) : null;
 }
 
@@ -101,12 +110,13 @@ export async function initializeGameConfigs(): Promise<void> {
   if (existing.length === 0) {
     for (const g of DEFAULT_GAMES) {
       const ladderType = PRAGMATIC_LADDER_GAMES.has(g.name) ? "pragmatic" : "default";
+      const isActive = DEFAULT_ACTIVE_GAMES.has(g.name);
       await storage.upsertGameConfig({
         gameId: g.gameId,
         name: g.name,
         provider: g.provider,
         imagePath: g.imagePath,
-        isActive: true,
+        isActive,
         ladderType,
         customLadder: null,
       });
@@ -115,6 +125,15 @@ export async function initializeGameConfigs(): Promise<void> {
       await storage.setFeedSetting(`provider_weight_${pw.provider}`, String(pw.weight));
     }
   }
+}
+
+export function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export async function refreshConfigCache(): Promise<CachedConfig> {

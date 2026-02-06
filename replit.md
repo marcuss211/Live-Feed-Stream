@@ -54,7 +54,8 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/admin/me` — Get current user's admin role (auto-bootstraps first user as super_admin)
 - `GET /api/admin/games` — List all game configurations
 - `PUT /api/admin/games/:gameId` — Update game config (name, provider, active, ladder, image)
-- `POST /api/admin/games/:gameId/image` — Upload game image (binary body, max 5MB)
+- `POST /api/admin/games` — Create a new game config (name, provider, gameId/slug, active, ladder, customLadder)
+- `POST /api/admin/games/:gameId/image` — Upload game image (binary body, max 300KB, PNG/JPG/WebP)
 - `GET /api/admin/settings` — Get all feed settings (SuperAdmin only for write)
 - `PUT /api/admin/settings` — Update provider weights and feed settings (SuperAdmin only)
 - `GET /api/admin/audit-logs` — View change audit history
@@ -96,9 +97,13 @@ Preferred communication style: Simple, everyday language.
 - **Roles**: SuperAdmin (all access), ContentManager (games/images/ladders only), User (no admin access)
 - **First user bootstrap**: First authenticated user on `/api/admin/me` is auto-promoted to SuperAdmin
 - **Game Config Cache**: `server/gameConfigCache.ts` — in-memory cache refreshed on admin changes, no restart needed
-- **Bet Ladder Types**: Pragmatic, Play'n GO, NetEnt, Hacksaw, Custom (comma-separated values)
-- **Image Upload**: Binary upload to `client/public/images/games/`, max 5MB, PNG/JPG/WebP
+- **Default Active Games**: 7 games active on initial seed (Gates of Olympus, Sweet Bonanza, Big Bass Bonanza, Sugar Rush, Starlight Princess, The Dog House, Fruit Party), rest inactive
+- **Game Creation**: Self-service "Yeni Oyun Ekle" modal with name, provider, auto-slug, image upload, active toggle, ladder type, custom ladder
+- **Bet Ladder Types**: Pragmatic, Play'n GO, NetEnt, Hacksaw, Custom. Per-game custom ladder overrides provider default when filled. Bracket format [1,2,3] accepted. Min 5 values, ascending order required.
+- **Image Upload**: Binary upload to `client/public/images/games/`, max 300KB, PNG/JPG/WebP. Guidelines shown in UI (256x256px, transparent bg preferred).
+- **Image Flow**: Upload -> file write -> DB update -> cache invalidate -> thumbnail refresh. Success only after all steps complete.
 - **Audit Logging**: Every admin change logged with timestamp, user, entity, field, old/new values
+- **Save Indicator**: "Updated" badge shown for 3s after successful save, only on mutation success
 
 ### Authentication
 - **Provider**: Replit OpenID Connect (OIDC) Auth

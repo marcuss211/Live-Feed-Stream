@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Upload, Shield, Settings, Gamepad2, ScrollText, LogIn } from "lucide-react";
+import { Save, Upload, Shield, Settings, Gamepad2, ScrollText, LogIn, Plus, X, Check, Info } from "lucide-react";
 
 interface GameConfig {
   id: number;
@@ -41,24 +41,50 @@ interface AuditLog {
 
 type Tab = "games" | "settings" | "logs";
 
-function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (gameId: string, updates: Partial<GameConfig>) => void; isSuperAdmin: boolean }) {
+function cleanLadderInput(val: string): string {
+  let cleaned = val.trim();
+  if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+    cleaned = cleaned.slice(1, -1);
+  }
+  return cleaned;
+}
+
+function validateLadder(val: string): string | null {
+  const cleaned = cleanLadderInput(val);
+  if (!cleaned) return null;
+  const parts = cleaned.split(",").map(v => v.trim()).filter(v => v !== "");
+  const nums = parts.map(v => Number(v));
+  if (nums.some(v => isNaN(v) || v <= 0)) return "Tum degerler pozitif sayi olmalidir";
+  if (nums.length < 5) return "En az 5 deger girilmelidir";
+  for (let i = 1; i < nums.length; i++) {
+    if (nums[i] <= nums[i - 1]) return "Degerler kucukten buyuge siralanmalidir";
+  }
+  return null;
+}
+
+function getLadderCount(val: string): number {
+  const cleaned = cleanLadderInput(val);
+  if (!cleaned) return 0;
+  return cleaned.split(",").map(v => v.trim()).filter(v => v !== "" && !isNaN(Number(v))).length;
+}
+
+function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (gameId: string, updates: Partial<GameConfig>, onSuccess?: () => void) => void; isSuperAdmin: boolean }) {
   const [isActive, setIsActive] = useState(game.isActive);
   const [ladderType, setLadderType] = useState(game.ladderType);
   const [customLadder, setCustomLadder] = useState(game.customLadder || "");
   const [uploading, setUploading] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  const [imgKey, setImgKey] = useState(0);
   const { toast } = useToast();
 
-  const hasChanges = isActive !== game.isActive || ladderType !== game.ladderType || customLadder !== (game.customLadder || "");
+  useEffect(() => {
+    setIsActive(game.isActive);
+    setLadderType(game.ladderType);
+    setCustomLadder(game.customLadder || "");
+    setImgKey(k => k + 1);
+  }, [game]);
 
-  const validateLadder = (val: string): string | null => {
-    if (!val.trim()) return null;
-    const nums = val.split(",").map(v => Number(v.trim()));
-    if (nums.some(v => isNaN(v) || v <= 0)) return "Tum degerler pozitif sayi olmalidir";
-    for (let i = 1; i < nums.length; i++) {
-      if (nums[i] <= nums[i - 1]) return "Degerler kucukten buyuge siralanmalidir";
-    }
-    return null;
-  };
+  const hasChanges = isActive !== game.isActive || ladderType !== game.ladderType || customLadder !== (game.customLadder || "");
 
   const handleSave = () => {
     if (customLadder.trim()) {
@@ -72,15 +98,18 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
     if (isActive !== game.isActive) updates.isActive = isActive;
     if (ladderType !== game.ladderType) updates.ladderType = ladderType;
     if (customLadder !== (game.customLadder || "")) updates.customLadder = customLadder || null;
-    onSave(game.gameId, updates);
+    onSave(game.gameId, updates, () => {
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 3000);
+    });
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "Hata", description: "Dosya boyutu 5MB'yi asamaz", variant: "destructive" });
+    if (file.size > 300 * 1024) {
+      toast({ title: "Hata", description: "Dosya boyutu 300KB'yi asamaz. Gorseli kucultup tekrar deneyin.", variant: "destructive" });
       return;
     }
 
@@ -99,21 +128,24 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
       }
       const result = await res.json();
       if (!result.imagePath) throw new Error("Gorsel kaydedilemedi");
-      toast({ title: "Basarili", description: "Gorsel guncellendi — canli feed'e aninda yansitildi" });
+      toast({ title: "Basarili", description: "Gorsel guncellendi — canli feed'e yansitildi" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
       queryClient.invalidateQueries({ queryKey: ["/api/game-images"] });
     } catch {
       toast({ title: "Hata", description: "Gorsel yuklenemedi", variant: "destructive" });
     } finally {
       setUploading(false);
+      e.target.value = "";
     }
   };
 
+  const ladderCount = getLadderCount(customLadder);
+
   return (
-    <div className="grid grid-cols-[60px_1fr_120px_100px_140px_1fr_80px] gap-3 items-center py-3 px-4 border-b border-border/50" data-testid={`game-row-${game.gameId}`}>
+    <div className="grid grid-cols-[60px_1fr_140px_80px_130px_1fr_100px] gap-2 items-center py-3 px-4 border-b border-border/50" data-testid={`game-row-${game.gameId}`}>
       <div className="flex items-center justify-center">
         {game.imagePath ? (
-          <img src={game.imagePath} alt={game.name} className="w-10 h-10 rounded object-cover" data-testid={`game-image-${game.gameId}`} />
+          <img key={imgKey} src={game.imagePath} alt={game.name} className="w-10 h-10 rounded object-cover" data-testid={`game-image-${game.gameId}`} />
         ) : (
           <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
             <Gamepad2 className="w-5 h-5 text-muted-foreground" />
@@ -125,17 +157,18 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
         <p className="font-medium text-sm truncate" data-testid={`game-name-${game.gameId}`}>{game.name}</p>
         <div className="flex items-center gap-2 mt-0.5">
           <Badge variant="outline" className="text-xs">{game.provider}</Badge>
-          <span className="text-xs text-muted-foreground">{game.gameId}</span>
+          <span className="text-[10px] text-muted-foreground">{game.gameId}</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-1">
         <label className="relative cursor-pointer">
           <input type="file" className="sr-only" accept="image/png,image/jpeg,image/webp" onChange={handleImageUpload} disabled={uploading} data-testid={`upload-input-${game.gameId}`} />
           <Button variant="outline" size="sm" disabled={uploading} asChild>
             <span><Upload className="w-3 h-3 mr-1" />{uploading ? "..." : "Upload"}</span>
           </Button>
         </label>
+        <span className="text-[8px] text-muted-foreground leading-tight">256x256 PNG/WEBP &lt;300KB</span>
       </div>
 
       <div className="flex items-center justify-center">
@@ -160,23 +193,236 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
         <Input
           value={customLadder}
           onChange={(e) => setCustomLadder(e.target.value)}
-          placeholder={ladderType === "default" ? "Bos = provider default" : "Bos = provider default ladder"}
+          placeholder="1,2,5,10,25... (min 5 deger)"
           className="h-8 text-xs"
           data-testid={`input-custom-ladder-${game.gameId}`}
         />
         {customLadder.trim() && (
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            {customLadder.split(",").filter(v => v.trim()).length} deger
+            {ladderCount} deger
+            {ladderCount > 0 && ladderCount < 5 && <span className="text-destructive ml-1">(min 5)</span>}
           </p>
         )}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-1.5">
+        {justSaved && (
+          <Badge variant="outline" className="text-[10px] text-green-500 border-green-500/40">
+            <Check className="w-2.5 h-2.5 mr-0.5" />Updated
+          </Badge>
+        )}
         <Button size="sm" onClick={handleSave} disabled={!hasChanges} data-testid={`save-game-${game.gameId}`}>
           <Save className="w-3 h-3 mr-1" />
           Save
         </Button>
       </div>
+    </div>
+  );
+}
+
+function AddGameModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [provider, setProvider] = useState<string>("pragmatic");
+  const [slug, setSlug] = useState("");
+  const [autoSlug, setAutoSlug] = useState(true);
+  const [isActive, setIsActive] = useState(false);
+  const [ladderType, setLadderType] = useState("default");
+  const [customLadder, setCustomLadder] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (autoSlug && name) {
+      setSlug(
+        name.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
+      );
+    }
+  }, [name, autoSlug]);
+
+  const handleSubmit = async () => {
+    if (!name.trim()) {
+      toast({ title: "Hata", description: "Oyun adi zorunludur", variant: "destructive" });
+      return;
+    }
+    if (!imageFile) {
+      toast({ title: "Hata", description: "Gorsel yuklemek zorunludur", variant: "destructive" });
+      return;
+    }
+
+    if (customLadder.trim()) {
+      const err = validateLadder(customLadder);
+      if (err) {
+        toast({ title: "Hata", description: err, variant: "destructive" });
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/games", {
+        name: name.trim(),
+        provider,
+        gameId: slug || undefined,
+        isActive,
+        ladderType,
+        customLadder: customLadder.trim() || null,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Olusturulamadi" }));
+        throw new Error(err.message);
+      }
+
+      const created = await res.json();
+
+      if (imageFile) {
+        const buffer = await imageFile.arrayBuffer();
+        const imgRes = await fetch(`/api/admin/games/${created.gameId}/image`, {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: buffer,
+          credentials: "include",
+        });
+        if (!imgRes.ok) {
+          toast({ title: "Uyari", description: "Oyun olusturuldu fakat gorsel yuklenemedi. Admin panelden tekrar deneyin." });
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/game-images"] });
+      toast({ title: "Basarili", description: `"${name}" oyunu eklendi` });
+      onCreated();
+      onClose();
+    } catch (err: any) {
+      toast({ title: "Hata", description: err.message || "Oyun eklenemedi", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <Card className="w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4 gap-2">
+          <h2 className="text-lg font-semibold">Yeni Oyun Ekle</h2>
+          <Button size="icon" variant="ghost" onClick={onClose} data-testid="button-close-modal">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="text-sm">Oyun Adi *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ornegin: Lucky Dragons" data-testid="input-new-game-name" />
+          </div>
+
+          <div>
+            <Label className="text-sm">Provider *</Label>
+            <Select value={provider} onValueChange={setProvider}>
+              <SelectTrigger data-testid="select-new-game-provider">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pragmatic">Pragmatic Play</SelectItem>
+                <SelectItem value="playngo">Play'n GO</SelectItem>
+                <SelectItem value="netent">NetEnt</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="text-sm">Slug (otomatik / duzenlenebilir)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                value={slug}
+                onChange={(e) => { setAutoSlug(false); setSlug(e.target.value); }}
+                placeholder="otomatik-olusturulur"
+                className="flex-1"
+                data-testid="input-new-game-slug"
+              />
+              {!autoSlug && (
+                <Button size="sm" variant="ghost" onClick={() => setAutoSlug(true)}>
+                  Sifirla
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-sm">Gorsel *</Label>
+            <div className="flex items-center gap-3 mt-1">
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  className="sr-only"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                  data-testid="input-new-game-image"
+                />
+                <Button variant="outline" size="sm" asChild>
+                  <span><Upload className="w-3 h-3 mr-1" />Dosya Sec</span>
+                </Button>
+              </label>
+              {imageFile && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{imageFile.name}</span>}
+            </div>
+            <div className="flex items-start gap-1.5 mt-1.5">
+              <Info className="w-3 h-3 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                256x256 px | PNG / WEBP | Maks 300 KB | Seffaf arkaplan tercih edilir
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label className="text-sm">Aktif</Label>
+            <Switch checked={isActive} onCheckedChange={setIsActive} data-testid="toggle-new-game-active" />
+          </div>
+
+          <div>
+            <Label className="text-sm">Ladder</Label>
+            <Select value={ladderType} onValueChange={setLadderType}>
+              <SelectTrigger data-testid="select-new-game-ladder">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="pragmatic">Pragmatic</SelectItem>
+                <SelectItem value="playngo">Play'n GO</SelectItem>
+                <SelectItem value="netent">NetEnt</SelectItem>
+                <SelectItem value="hacksaw">Hacksaw</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="text-sm">Custom Ladder (opsiyonel)</Label>
+            <Input
+              value={customLadder}
+              onChange={(e) => setCustomLadder(e.target.value)}
+              placeholder="1,2,5,10,25,50,100... (min 5 deger)"
+              data-testid="input-new-game-custom-ladder"
+            />
+            {customLadder.trim() && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {getLadderCount(customLadder)} deger
+                {getLadderCount(customLadder) > 0 && getLadderCount(customLadder) < 5 && <span className="text-destructive ml-1">(min 5)</span>}
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <Button variant="ghost" onClick={onClose} disabled={submitting}>
+              Iptal
+            </Button>
+            <Button onClick={handleSubmit} disabled={submitting || !name.trim() || !imageFile} data-testid="button-create-game">
+              {submitting ? "Kaydediliyor..." : "Kaydet"}
+            </Button>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
@@ -263,6 +509,7 @@ function AuditLogsPanel() {
 
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<Tab>("games");
+  const [showAddModal, setShowAddModal] = useState(false);
   const { toast } = useToast();
 
   const { data: adminMe, isLoading: adminLoading } = useQuery<AdminMe | null>({
@@ -286,17 +533,20 @@ export default function AdminPanel() {
   });
 
   const updateGameMutation = useMutation({
-    mutationFn: async ({ gameId, updates }: { gameId: string; updates: any }) => {
+    mutationFn: async ({ gameId, updates, onSuccessCb }: { gameId: string; updates: any; onSuccessCb?: () => void }) => {
       const res = await apiRequest("PUT", `/api/admin/games/${gameId}`, updates);
-      return res.json();
+      const data = await res.json();
+      return { data, onSuccessCb };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
       queryClient.invalidateQueries({ queryKey: ["/api/game-images"] });
       toast({ title: "Basarili", description: "Oyun ayari guncellendi" });
+      result.onSuccessCb?.();
     },
-    onError: () => {
-      toast({ title: "Hata", description: "Guncelleme basarisiz", variant: "destructive" });
+    onError: (err: any) => {
+      const msg = err?.message || "Guncelleme basarisiz";
+      toast({ title: "Hata", description: msg, variant: "destructive" });
     },
   });
 
@@ -388,7 +638,22 @@ export default function AdminPanel() {
       <main className="p-6 max-w-[1400px] mx-auto">
         {activeTab === "games" && (
           <div>
-            <div className="grid grid-cols-[60px_1fr_120px_100px_140px_1fr_80px] gap-3 items-center py-2 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wider border-b border-border">
+            <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Oyun Listesi</h2>
+                {games && (
+                  <Badge variant="outline" className="text-xs">
+                    {games.filter(g => g.isActive).length} aktif / {games.length} toplam
+                  </Badge>
+                )}
+              </div>
+              <Button onClick={() => setShowAddModal(true)} data-testid="button-add-game">
+                <Plus className="w-4 h-4 mr-1" />
+                Yeni Oyun Ekle
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-[60px_1fr_140px_80px_130px_1fr_100px] gap-2 items-center py-2 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wider border-b border-border">
               <span>Gorsel</span>
               <span>Oyun</span>
               <span>Gorsel Yuk.</span>
@@ -404,11 +669,20 @@ export default function AdminPanel() {
                 <GameRow
                   key={game.gameId}
                   game={game}
-                  onSave={(gameId, updates) => updateGameMutation.mutate({ gameId, updates })}
+                  onSave={(gameId, updates, onSuccessCb) => updateGameMutation.mutate({ gameId, updates, onSuccessCb })}
                   isSuperAdmin={isSuperAdmin}
                 />
               ))
             )}
+
+            <div className="mt-4 flex items-start gap-2 px-4 py-3 rounded-md bg-muted/30 border border-border/30">
+              <Info className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p><strong>Gorsel kurallari:</strong> 256x256 px | PNG / WEBP | Maks 300 KB | Seffaf arkaplan tercih edilir</p>
+                <p><strong>Custom Ladder:</strong> Virgul ile ayrilmis artan sira pozitif sayilar. Min 5 deger. Koseli parantez kabul edilir: [1,2,5,10,25]</p>
+                <p><strong>Custom Ladder doluysa</strong> o oyun icin feed bet uretimi tamamen bu ladder'dan yapilir. Bos ise provider ladder kullanilir.</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -418,6 +692,15 @@ export default function AdminPanel() {
 
         {activeTab === "logs" && <AuditLogsPanel />}
       </main>
+
+      {showAddModal && (
+        <AddGameModal
+          onClose={() => setShowAddModal(false)}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
+          }}
+        />
+      )}
     </div>
   );
 }

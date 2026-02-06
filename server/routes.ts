@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
-import { getConfig, refreshConfigCache, initializeGameConfigs, invalidateCache, getLadderForGame, isLadderGame, type CachedGameDef, type Provider } from "./gameConfigCache";
+import { getConfig, refreshConfigCache, initializeGameConfigs, invalidateCache, getLadderForGame, isLadderGame, generateSlug, parseCustomLadder, type CachedGameDef, type Provider } from "./gameConfigCache";
 import path from "path";
 import fs from "fs";
 
@@ -487,6 +487,83 @@ export async function registerRoutes(
     }
   });
 
+  const gameCreateSchema = z.object({
+    name: z.string().min(1).max(200),
+    provider: z.enum(["pragmatic", "playngo", "netent", "other"]),
+    gameId: z.string().min(1).max(100).optional(),
+    isActive: z.boolean().default(false),
+    ladderType: z.enum(["default", "pragmatic", "playngo", "netent", "hacksaw", "custom"]).default("default"),
+    customLadder: z.string().max(2000).nullable().optional(),
+  });
+
+  app.post("/api/admin/games", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
+
+      const parsed = gameCreateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+
+      const slug = parsed.data.gameId || generateSlug(parsed.data.name);
+      if (!slug) {
+        return res.status(400).json({ message: "Gecerli bir oyun adi giriniz" });
+      }
+
+      const existing = await storage.getGameConfig(slug);
+      if (existing) {
+        return res.status(409).json({ message: "Bu slug zaten kullanilmakta: " + slug });
+      }
+
+      if (parsed.data.customLadder) {
+        let cleaned = parsed.data.customLadder.trim();
+        if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+          cleaned = cleaned.slice(1, -1);
+        }
+        const vals = cleaned.split(",").map(v => Number(v.trim()));
+        if (vals.some(v => isNaN(v) || v <= 0)) {
+          return res.status(400).json({ message: "Custom ladder: tum degerler pozitif sayi olmali" });
+        }
+        if (vals.length < 5) {
+          return res.status(400).json({ message: "Custom ladder en az 5 deger icermeli" });
+        }
+        for (let i = 1; i < vals.length; i++) {
+          if (vals[i] <= vals[i - 1]) {
+            return res.status(400).json({ message: "Custom ladder degerleri artan sirada olmali" });
+          }
+        }
+      }
+
+      const newGame = await storage.upsertGameConfig({
+        gameId: slug,
+        name: parsed.data.name,
+        provider: parsed.data.provider,
+        imagePath: null,
+        isActive: parsed.data.isActive,
+        ladderType: parsed.data.ladderType,
+        customLadder: parsed.data.customLadder || null,
+      });
+
+      await storage.createAuditLog({
+        adminUserId: userId,
+        adminEmail: userEmail,
+        entity: "game_config",
+        entityId: slug,
+        field: "created",
+        oldValue: undefined,
+        newValue: parsed.data.name,
+      });
+
+      invalidateCache();
+      await refreshConfigCache();
+      res.status(201).json(newGame);
+    } catch (error) {
+      console.error("Create game error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   const gameUpdateSchema = z.object({
     name: z.string().min(1).max(200).optional(),
     provider: z.enum(["pragmatic", "playngo", "netent", "other"]).optional(),
@@ -511,13 +588,20 @@ export async function registerRoutes(
       if (!existing) return res.status(404).json({ message: "Game not found" });
 
       if (parsed.data.customLadder) {
-        const vals = parsed.data.customLadder.split(",").map(v => Number(v.trim()));
+        let cleaned = parsed.data.customLadder.trim();
+        if (cleaned.startsWith("[") && cleaned.endsWith("]")) {
+          cleaned = cleaned.slice(1, -1);
+        }
+        const vals = cleaned.split(",").map(v => Number(v.trim()));
         if (vals.some(v => isNaN(v) || v <= 0)) {
-          return res.status(400).json({ message: "Custom ladder must be comma-separated positive numbers" });
+          return res.status(400).json({ message: "Tum degerler pozitif sayi olmalidir" });
+        }
+        if (vals.length < 5) {
+          return res.status(400).json({ message: "Custom ladder en az 5 deger icermeli" });
         }
         for (let i = 1; i < vals.length; i++) {
           if (vals[i] <= vals[i - 1]) {
-            return res.status(400).json({ message: "Custom ladder values must be in ascending order" });
+            return res.status(400).json({ message: "Degerler kucukten buyuge siralanmalidir" });
           }
         }
       }
@@ -567,7 +651,7 @@ export async function registerRoutes(
         try {
           const buffer = Buffer.concat(chunks);
           if (buffer.length === 0) return res.status(400).json({ message: "No file uploaded" });
-          if (buffer.length > 5 * 1024 * 1024) return res.status(400).json({ message: "File too large (max 5MB)" });
+          if (buffer.length > 300 * 1024) return res.status(400).json({ message: "Dosya boyutu 300KB'yi asamaz" });
 
           const header = buffer.slice(0, 8);
           const isPng = header[0] === 0x89 && header[1] === 0x50;

@@ -1,0 +1,127 @@
+Mevcut /admin “Feed Yonetim Paneli > Oyunlar” ekranı aşağıdaki şekilde güncellenecek.
+
+1) Varsayılan durum: sadece 7 oyun aktif
+
+Admin panel açıldığında aşağıdaki oyunlar Active = ON olacak, diğerleri OFF olacak:
+
+Gates of Olympus
+
+Sweet Bonanza
+
+Big Bass Bonanza
+
+Sugar Rush
+
+Starlight Princess
+
+The Dog House
+
+Fruit Party
+
+Not: Bu kural sadece initial/default state; admin sonradan aktif/pasif değiştirebilir.
+
+2) Oyun ekleme (self-service) – bu UI’ya eklenecek
+
+“Oyunlar” sayfasının üst kısmına “+ Yeni Oyun Ekle” butonu eklenecek.
+
+Butona basınca modal/form açılacak:
+
+Oyun Adı (zorunlu)
+
+Provider (dropdown + custom text)
+
+Slug (otomatik üret, admin isterse düzenleyebilsin)
+
+Görsel Upload (zorunlu)
+
+Aktif (default OFF)
+
+Ladder (dropdown: Pragmatic / PlaynGo / NetEnt / Hacksaw / Custom)
+
+Custom Ladder (opsiyonel)
+
+Kaydet (Save) sonrası:
+
+Oyun listeye yeni satır olarak düşecek
+
+Feed generator yeni oyunu ancak Aktif ON ise kullanacak
+
+3) Görsel upload sorunu – kesin düzeltme
+
+Şu an “Upload” sonrası “başarılı” yazıyor ama görsel değişmiyor. Bunu düzelt:
+
+Upload akışı şu şekilde olmalı:
+
+Dosyayı yükle (storage/CDN)
+
+DB’de ilgili oyunun image_url alanını güncelle
+
+Cache invalidate / refresh (game config)
+
+UI’daki soldaki thumbnail’ı anında yenile (cache-bust query ile)
+
+Başarı mesajı ancak 1-2-3 tamamlanınca gösterilecek.
+
+4) Görsel kuralları UI’da yazsın (net)
+
+Upload butonunun yanında küçük yardım metni göster:
+
+Önerilen: 256x256 px
+
+Format: PNG / WEBP
+
+Maks: 300 KB
+
+Tercih: transparent background
+
+Uymuyorsa: otomatik resize + optimize veya hata mesajı
+
+5) Her oyun için ayrı Custom Ladder alanı (aktif hale getir)
+
+Şu an “Custom Ladder” input var ama “provider default ladder” mantığında. Bunu şu şekilde yap:
+
+Her oyunun satırındaki Custom Ladder alanına admin kendi ladder listesini yazabilsin.
+
+Format: 1,2,3... veya [1,2,3...] (ikisi de kabul)
+
+Validation:
+
+sadece sayı + virgül + boşluk + [] kabul
+
+min 5 değer
+
+artan sıra kontrolü (ascending)
+
+Eğer Custom Ladder doluysa:
+
+o oyun için feed bet üretimi tamamen bu ladder’dan yapılacak
+
+Eğer boş ise:
+
+dropdown’da seçilen Ladder’a göre provider ladder kullanılacak
+
+Save tıklandığında:
+
+DB’de oyunun custom_ladder alanı güncellenecek
+
+Ladder cache invalidate edilecek
+
+Yeni eventler hemen yeni ladder’ı kullanacak (restart yok)
+
+6) Save davranışı
+
+Mevcut “Save” butonu sadece UI’da değil, backend’de de şu alanları kaydedecek:
+
+active
+
+provider
+
+ladder_type
+
+custom_ladder
+
+image_url (upload sonrası)
+
+Kaydedince “Saved” toast + satırda “Updated” durum göstergesi görünsün.
+
+Amaç: Bu admin panel üzerinden ben kendim oyun ekleyebileyim (provider + isim + görsel + ladder), sadece 7 oyunu başlangıçta aktif görelim, görsel değişiklikleri gerçekten live’a yansısın ve her oyun için ayrı custom bet ladder girip kaydedince sistem anında bunu kullansın.
