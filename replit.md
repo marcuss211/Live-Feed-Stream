@@ -55,6 +55,7 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/admin/games` — List all game configurations
 - `PUT /api/admin/games/:gameId` — Update game config (name, provider, active, ladder, image)
 - `POST /api/admin/games` — Create a new game config (name, provider, gameId/slug, active, ladder, customLadder)
+- `DELETE /api/admin/games/:gameId` — Soft-delete a game (sets is_deleted=true, is_active=false, removes from feed)
 - `POST /api/admin/games/:gameId/image` — Upload game image (binary body, max 300KB, PNG/JPG/WebP)
 - `GET /api/admin/settings` — Get all feed settings (SuperAdmin only for write)
 - `PUT /api/admin/settings` — Update provider weights and feed settings (SuperAdmin only)
@@ -101,7 +102,8 @@ Preferred communication style: Simple, everyday language.
 - **Game Creation**: Self-service "Yeni Oyun Ekle" modal with name, provider, auto-slug, image upload, active toggle, ladder type, custom ladder
 - **Bet Ladder Types**: Pragmatic, Play'n GO, NetEnt, Hacksaw, Custom. Per-game custom ladder overrides provider default when filled. Bracket format [1,2,3] accepted. Min 5 values, ascending order required.
 - **Image Upload**: Binary upload to `client/public/images/games/`, max 300KB, PNG/JPG/WebP. Guidelines shown in UI (256x256px, transparent bg preferred).
-- **Image Flow**: Upload -> file write -> DB update -> cache invalidate -> thumbnail refresh. Success only after all steps complete.
+- **Image Flow**: Upload -> old files cleaned -> unique filename (`{gameId}_{timestamp}.{ext}`) written -> DB update -> cache invalidate -> optimistic UI update from response -> query refetch. Success only after all steps complete.
+- **Cache-bust**: Each upload generates a unique filename with timestamp, eliminating browser/CDN caching issues. Old game images for the same gameId are cleaned up on disk.
 - **Audit Logging**: Every admin change logged with timestamp, user, entity, field, old/new values
 - **Save Indicator**: "Updated" badge shown for 3s after successful save, only on mutation success
 

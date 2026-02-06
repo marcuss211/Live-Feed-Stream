@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Upload, Shield, Settings, Gamepad2, ScrollText, LogIn, Plus, X, Check, Info } from "lucide-react";
+import { Save, Upload, Shield, Settings, Gamepad2, ScrollText, LogIn, Plus, X, Check, Info, Trash2, AlertTriangle } from "lucide-react";
 
 interface GameConfig {
   id: number;
@@ -68,13 +68,44 @@ function getLadderCount(val: string): number {
   return cleaned.split(",").map(v => v.trim()).filter(v => v !== "" && !isNaN(Number(v))).length;
 }
 
-function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (gameId: string, updates: Partial<GameConfig>, onSuccess?: () => void) => void; isSuperAdmin: boolean }) {
+function DeleteConfirmModal({ gameName, onConfirm, onCancel }: { gameName: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
+      <Card className="w-full max-w-md mx-4 p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-md bg-destructive/10 flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+          </div>
+          <h3 className="text-lg font-semibold">Bu oyunu silmek istedigine emin misin?</h3>
+        </div>
+        <p className="text-sm text-muted-foreground mb-1">
+          <strong>"{gameName}"</strong> oyunu kalici olarak feed'den kaldirilacak.
+        </p>
+        <p className="text-xs text-muted-foreground mb-5 bg-muted/40 rounded-md p-2.5">
+          Silinen oyun feed'de bir daha gorunmez. Istersen pasif yapmayi da tercih edebilirsin.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onCancel} data-testid="button-cancel-delete">
+            Iptal
+          </Button>
+          <Button variant="destructive" onClick={onConfirm} data-testid="button-confirm-delete">
+            <Trash2 className="w-4 h-4 mr-1" />
+            Sil
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function GameRow({ game, onSave, onDelete, isSuperAdmin }: { game: GameConfig; onSave: (gameId: string, updates: Partial<GameConfig>, onSuccess?: () => void) => void; onDelete: (gameId: string) => void; isSuperAdmin: boolean }) {
   const [isActive, setIsActive] = useState(game.isActive);
   const [ladderType, setLadderType] = useState(game.ladderType);
   const [customLadder, setCustomLadder] = useState(game.customLadder || "");
   const [uploading, setUploading] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [imgKey, setImgKey] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -128,6 +159,13 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
       }
       const result = await res.json();
       if (!result.imagePath) throw new Error("Gorsel kaydedilemedi");
+
+      queryClient.setQueryData<GameConfig[]>(["/api/admin/games"], (old) => {
+        if (!old) return old;
+        return old.map(g => g.gameId === game.gameId ? { ...g, imagePath: result.imagePath } : g);
+      });
+      setImgKey(k => k + 1);
+
       toast({ title: "Basarili", description: "Gorsel guncellendi — canli feed'e yansitildi" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
       queryClient.invalidateQueries({ queryKey: ["/api/game-images"] });
@@ -142,7 +180,7 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
   const ladderCount = getLadderCount(customLadder);
 
   return (
-    <div className="grid grid-cols-[60px_1fr_140px_80px_130px_1fr_100px] gap-2 items-center py-3 px-4 border-b border-border/50" data-testid={`game-row-${game.gameId}`}>
+    <div className="grid grid-cols-[60px_1fr_140px_80px_130px_1fr_140px] gap-2 items-center py-3 px-4 border-b border-border/50" data-testid={`game-row-${game.gameId}`}>
       <div className="flex items-center justify-center">
         {game.imagePath ? (
           <img key={imgKey} src={game.imagePath} alt={game.name} className="w-10 h-10 rounded object-cover" data-testid={`game-image-${game.gameId}`} />
@@ -215,7 +253,20 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
           <Save className="w-3 h-3 mr-1" />
           Save
         </Button>
+        <Button size="icon" variant="ghost" onClick={() => setShowDeleteConfirm(true)} data-testid={`delete-game-${game.gameId}`}>
+          <Trash2 className="w-4 h-4 text-destructive" />
+        </Button>
       </div>
+      {showDeleteConfirm && (
+        <DeleteConfirmModal
+          gameName={game.name}
+          onConfirm={() => {
+            setShowDeleteConfirm(false);
+            onDelete(game.gameId);
+          }}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
     </div>
   );
 }
@@ -550,6 +601,21 @@ export default function AdminPanel() {
     },
   });
 
+  const deleteGameMutation = useMutation({
+    mutationFn: async (gameId: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/games/${gameId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/game-images"] });
+      toast({ title: "Basarili", description: "Oyun silindi" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Hata", description: err?.message || "Silme basarisiz", variant: "destructive" });
+    },
+  });
+
   const updateSettingsMutation = useMutation({
     mutationFn: async (updates: Record<string, string>) => {
       const res = await apiRequest("PUT", "/api/admin/settings", updates);
@@ -653,7 +719,7 @@ export default function AdminPanel() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-[60px_1fr_140px_80px_130px_1fr_100px] gap-2 items-center py-2 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wider border-b border-border">
+            <div className="grid grid-cols-[60px_1fr_140px_80px_130px_1fr_140px] gap-2 items-center py-2 px-4 text-xs text-muted-foreground font-medium uppercase tracking-wider border-b border-border">
               <span>Gorsel</span>
               <span>Oyun</span>
               <span>Gorsel Yuk.</span>
@@ -670,6 +736,7 @@ export default function AdminPanel() {
                   key={game.gameId}
                   game={game}
                   onSave={(gameId, updates, onSuccessCb) => updateGameMutation.mutate({ gameId, updates, onSuccessCb })}
+                  onDelete={(gameId) => deleteGameMutation.mutate(gameId)}
                   isSuperAdmin={isSuperAdmin}
                 />
               ))

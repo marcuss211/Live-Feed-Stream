@@ -660,9 +660,16 @@ export async function registerRoutes(
           if (!isPng && !isJpg && !isWebp) return res.status(400).json({ message: "Invalid image format (PNG, JPG, WebP only)" });
 
           const ext = isPng ? "png" : isJpg ? "jpg" : "webp";
-          const filename = `${gameId}.${ext}`;
+          const ts = Date.now();
+          const filename = `${gameId}_${ts}.${ext}`;
           const imgDir = path.join(process.cwd(), "client", "public", "images", "games");
           if (!fs.existsSync(imgDir)) fs.mkdirSync(imgDir, { recursive: true });
+
+          const existingFiles = fs.readdirSync(imgDir).filter(f => f.startsWith(`${gameId}_`) || f.startsWith(`${gameId}.`));
+          for (const old of existingFiles) {
+            try { fs.unlinkSync(path.join(imgDir, old)); } catch {}
+          }
+
           const filePath = path.join(imgDir, filename);
           fs.writeFileSync(filePath, buffer);
 
@@ -670,7 +677,7 @@ export async function registerRoutes(
             return res.status(500).json({ message: "Dosya kaydedilemedi" });
           }
 
-          const imagePath = `/images/games/${filename}?v=${Date.now()}`;
+          const imagePath = `/images/games/${filename}`;
           const existing = await storage.getGameConfig(gameId);
           if (!existing) {
             return res.status(404).json({ message: "Oyun bulunamadi" });
@@ -702,6 +709,37 @@ export async function registerRoutes(
       });
     } catch (error) {
       console.error("Image upload error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/admin/games/:gameId", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { gameId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const userEmail = req.user?.claims?.email;
+
+      const existing = await storage.getGameConfig(gameId);
+      if (!existing) return res.status(404).json({ message: "Oyun bulunamadi" });
+
+      const deleted = await storage.softDeleteGameConfig(gameId);
+      if (!deleted) return res.status(500).json({ message: "Silme islemi basarisiz" });
+
+      await storage.createAuditLog({
+        adminUserId: userId,
+        adminEmail: userEmail,
+        entity: "game_config",
+        entityId: gameId,
+        field: "deleted",
+        oldValue: existing.name,
+        newValue: "soft_deleted",
+      });
+
+      invalidateCache();
+      await refreshConfigCache();
+      res.json({ success: true, message: "Oyun silindi" });
+    } catch (error) {
+      console.error("Delete game error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

@@ -13,6 +13,7 @@ export interface IStorage {
   getGameConfig(gameId: string): Promise<GameConfig | undefined>;
   upsertGameConfig(config: InsertGameConfig): Promise<GameConfig>;
   updateGameConfig(gameId: string, updates: Partial<InsertGameConfig>): Promise<GameConfig | undefined>;
+  softDeleteGameConfig(gameId: string): Promise<GameConfig | undefined>;
 
   getFeedSetting(key: string): Promise<string | undefined>;
   setFeedSetting(key: string, value: string): Promise<void>;
@@ -58,7 +59,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllGameConfigs(): Promise<GameConfig[]> {
-    return await db.select().from(gameConfigs).orderBy(asc(gameConfigs.id));
+    return await db.select().from(gameConfigs).where(eq(gameConfigs.isDeleted, false)).orderBy(asc(gameConfigs.id));
   }
 
   async getGameConfig(gameId: string): Promise<GameConfig | undefined> {
@@ -83,6 +84,11 @@ export class DatabaseStorage implements IStorage {
 
   async updateGameConfig(gameId: string, updates: Partial<InsertGameConfig>): Promise<GameConfig | undefined> {
     const [result] = await db.update(gameConfigs).set(updates).where(eq(gameConfigs.gameId, gameId)).returning();
+    return result;
+  }
+
+  async softDeleteGameConfig(gameId: string): Promise<GameConfig | undefined> {
+    const [result] = await db.update(gameConfigs).set({ isDeleted: true, isActive: false }).where(eq(gameConfigs.gameId, gameId)).returning();
     return result;
   }
 
