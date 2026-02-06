@@ -1,0 +1,118 @@
+Sistem için bir Admin Panel – Game Feed Management Module geliştirilecektir.
+Bu panel üzerinden canlı slot aktivite feed’inde kullanılan oyunların görselleri ve bet ladder ayarları yönetilebilecektir.
+
+1) Oyun Yönetim Tablosu
+
+Admin panelinde her oyun için aşağıdaki alanlar bulunacaktır:
+
+Game ID (unique)
+
+Oyun adı
+
+Provider
+
+Oyun görseli (upload / replace)
+
+Aktif / Pasif durumu
+
+Kullanılacak Bet Ladder tipi
+
+Custom Bet Ladder (opsiyonel manuel giriş)
+
+Her satırda Save / Apply butonu bulunacaktır.
+
+2) Oyun görseli yönetimi
+
+Admin her oyun için yeni görsel upload edebilecek.
+
+Görsel kaydedildiğinde CDN’e yüklenerek otomatik optimize edilecek.
+
+“Apply” tıklandığında değişiklik anlık olarak live feed’e yansıyacaktır (cache refresh tetiklenecek).
+
+3) Bet Ladder Yönetimi
+
+Her oyun için seçilebilir ladder sistemi bulunacaktır:
+
+Pragmatic Ladder
+
+Play’n GO Ladder
+
+NetEnt Ladder
+
+Hacksaw Ladder
+
+Custom Ladder (manuel değer girme)
+
+Kurallar:
+
+Eğer oyun Pragmatic provider ise varsayılan olarak Pragmatic Ladder seçili gelecektir.
+
+Pragmatic dışındaki oyunlar seçilen ladder’a göre işlenecektir.
+
+Admin isterse herhangi bir oyun için custom ladder değerleri girebilir (comma-separated ladder values).
+
+Ladder değiştirildiğinde yeni event üretim algoritması bu ladder’ı hemen kullanmaya başlayacaktır.
+
+4) Değişikliklerin sisteme yansıması
+
+Admin değişiklikleri onayladığında sistem:
+
+Ladder cache’i refresh eder
+
+Game config cache’i invalidate eder
+
+Yeni event üretimlerinde yeni ayarları kullanır
+
+Sistem restart gerektirmez; değişiklikler real-time uygulanır.
+
+5) Amaç
+
+Admin ekibinin geliştiriciye ihtiyaç duymadan:
+
+Oyun görsellerini değiştirebilmesi
+
+Her oyun için bet ladder ayarlayabilmesi
+
+Pragmatic ve diğer provider oyunlarını farklı ladder sistemleri ile yönetebilmesi
+
+Onay sonrası değişikliklerin anında canlı feed’e yansıması
+
+sağlanacaktır.
+
+
+
+
+Bu modül yani akan bahisler siteye entegre edilecek, ancak oyuncu tarafı ile kesinlikle karışmayacak şekilde ayrı bir Admin Panel alanı olarak tasarlanacaktır.
+
+Admin panel ayrımı
+
+Admin panel ayrı route/subdomain üzerinde çalışacaktır (örnek: /admin/feed veya admin.domain.com).
+
+Oyuncu arayüzü ile aynı header/menu/tema kullanılmayacak; admin’e özel sade layout.
+
+Admin panel erişimi login zorunlu olacak ve sadece yetkili roller görebilecek.
+
+Yetkilendirme (RBAC)
+
+Roller: SuperAdmin, ContentManager
+
+ContentManager: oyun görseli değiştirir, ladder ayarlar, aktif/pasif yapar
+
+SuperAdmin: tüm ayarlar + provider ağırlıkları + seed/cooldown parametrelerini değiştirebilir
+
+Entegrasyon şekli
+
+Admin panelde yapılan değişiklikler onaylandığında backend’e kaydedilecek ve:
+
+game config cache invalidate
+
+ladder cache invalidate
+
+live feed generator yeni ayarları anında kullanacak
+(deploy/restart gerektirmeyecek)
+
+Güvenlik & iz kayıtları
+
+Her değişiklikte audit log tutulacak: admin_user, timestamp, field, old_value, new_value
+
+Görsel upload için dosya doğrulama (format/size) ve güvenli storage kullanılacak.

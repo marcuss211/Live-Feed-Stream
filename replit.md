@@ -50,6 +50,16 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/stats` — Get aggregated profit/loss statistics
 - `GET /api/auth/user` — Get authenticated user info
 
+### Admin API Endpoints (requires auth + admin role)
+- `GET /api/admin/me` — Get current user's admin role (auto-bootstraps first user as super_admin)
+- `GET /api/admin/games` — List all game configurations
+- `PUT /api/admin/games/:gameId` — Update game config (name, provider, active, ladder, image)
+- `POST /api/admin/games/:gameId/image` — Upload game image (binary body, max 5MB)
+- `GET /api/admin/settings` — Get all feed settings (SuperAdmin only for write)
+- `PUT /api/admin/settings` — Update provider weights and feed settings (SuperAdmin only)
+- `GET /api/admin/audit-logs` — View change audit history
+- `POST /api/admin/promote` — Promote/demote user roles (SuperAdmin only)
+
 ### Real-time Data Flow
 - Server generates mock transactions every 1.5s via `setInterval`
 - New transactions are saved to DB and broadcast to all connected SSE clients
@@ -75,8 +85,20 @@ Preferred communication style: Simple, everyday language.
 
 ### Database Tables
 1. **transactions** — Core data table (id, username, amount, currency, type WIN/LOSS, game, multiplier, timestamp, isSimulation)
-2. **users** — User accounts for Replit Auth (id, email, firstName, lastName, profileImageUrl, timestamps)
+2. **users** — User accounts for Replit Auth (id, email, firstName, lastName, profileImageUrl, role, timestamps)
 3. **sessions** — Session storage for express-session with connect-pg-simple
+4. **game_configs** — Admin-managed game configurations (gameId, name, provider, imagePath, isActive, ladderType, customLadder)
+5. **feed_settings** — Key-value store for feed parameters (provider weights, etc.)
+6. **audit_logs** — Change audit trail (adminUserId, adminEmail, entity, entityId, field, oldValue, newValue, timestamp)
+
+### Admin Panel
+- **Route**: `/admin` — separate admin layout, not shared with player UI
+- **Roles**: SuperAdmin (all access), ContentManager (games/images/ladders only), User (no admin access)
+- **First user bootstrap**: First authenticated user on `/api/admin/me` is auto-promoted to SuperAdmin
+- **Game Config Cache**: `server/gameConfigCache.ts` — in-memory cache refreshed on admin changes, no restart needed
+- **Bet Ladder Types**: Pragmatic, Play'n GO, NetEnt, Hacksaw, Custom (comma-separated values)
+- **Image Upload**: Binary upload to `client/public/images/games/`, max 5MB, PNG/JPG/WebP
+- **Audit Logging**: Every admin change logged with timestamp, user, entity, field, old/new values
 
 ### Authentication
 - **Provider**: Replit OpenID Connect (OIDC) Auth
