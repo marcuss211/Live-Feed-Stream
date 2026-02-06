@@ -1,125 +1,117 @@
 import { motion } from "framer-motion";
 import { forwardRef } from "react";
 import { type Transaction } from "@shared/schema";
-import { format } from "date-fns";
-import { TrendingUp, TrendingDown, User, Dices, Trophy, Flame, Star, Zap, Target, Sparkles } from "lucide-react";
+import { Users } from "lucide-react";
 import { clsx } from "clsx";
 
-const GAME_ICONS: Record<string, typeof Dices> = {
-  "Sweet Bonanza": Star,
-  "Gates of Olympus": Zap,
-  "Aviator": TrendingUp,
-  "Crash": Flame,
-  "Roulette": Target,
-  "Blackjack": Dices,
-  "Poker": Dices,
-  "Baccarat": Dices,
-  "Slots": Sparkles,
-  "Mines": Target,
-  "Plinko": Trophy,
-  "Dice": Dices,
-  "Limbo": Flame,
+const GAME_IMAGES: Record<string, string> = {
+  "Sweet Bonanza": "/images/games/sweet-bonanza.png",
+  "Gates of Olympus": "/images/games/gates-of-olympus.png",
+  "Gates of Olympus 1000": "/images/games/gates-of-olympus.png",
+  "Gates of Olympus Super Scatter": "/images/games/gates-of-olympus.png",
+  "Aviator": "/images/games/aviator.png",
+  "Crash": "/images/games/crash.png",
+  "Roulette": "/images/games/roulette.png",
+  "Lightning Roulette": "/images/games/lightning-roulette.png",
+  "Blackjack": "/images/games/blackjack.png",
+  "Poker": "/images/games/poker.png",
+  "Baccarat": "/images/games/baccarat.png",
+  "Slots": "/images/games/slots.png",
+  "Mines": "/images/games/mines.png",
+  "Plinko": "/images/games/plinko.png",
+  "Dice": "/images/games/dice.png",
+  "Limbo": "/images/games/limbo.png",
+  "Big Bass Bonanza": "/images/games/big-bass-bonanza.png",
+  "Book of Dead": "/images/games/book-of-dead.png",
+  "Crazy Time": "/images/games/crazy-time.png",
+  "Monopoly Live": "/images/games/monopoly-live.png",
+  "Dream Catcher": "/images/games/dream-catcher.png",
+  "Mega Ball": "/images/games/mega-ball.png",
+  "40 Burning Hot": "/images/games/burning-hot.png",
+  "Black Seven Bell Link": "/images/games/slots.png",
+  "100 Bulky Dice Golden Coins Link": "/images/games/dice.png",
+  "VIP Flaming Hot Extreme Bell Link": "/images/games/burning-hot.png",
 };
 
 interface TransactionCardProps {
   transaction: Transaction;
   isNew?: boolean;
-  compact?: boolean;
 }
 
-export const TransactionCard = forwardRef<HTMLDivElement, TransactionCardProps>(({ transaction, isNew, compact }, ref) => {
-  const isWin = transaction.type === "WIN";
-  const GameIcon = GAME_ICONS[transaction.game] || Dices;
-  const amount = Number(transaction.amount);
+function parseMultiplier(m: string | null): number {
+  if (!m) return 0;
+  const val = parseFloat(m.replace(/x$/i, ""));
+  return isNaN(val) ? 0 : val;
+}
 
-  const isBigWin = isWin && amount >= 5000;
+export function getWinnings(tx: Transaction): number {
+  const bet = Number(tx.amount);
+  const mult = parseMultiplier(tx.multiplier);
+  if (tx.type === "WIN") {
+    return mult > 0 ? bet * mult : bet;
+  }
+  return -bet;
+}
+
+export const TransactionRow = forwardRef<HTMLTableRowElement, TransactionCardProps>(({ transaction, isNew }, ref) => {
+  const isWin = transaction.type === "WIN";
+  const amount = Number(transaction.amount);
+  const gameImage = GAME_IMAGES[transaction.game] || "/images/games/slots.png";
+  const multiplier = parseMultiplier(transaction.multiplier);
+  const winnings = getWinnings(transaction);
+  const absWinnings = Math.abs(winnings);
 
   return (
-    <motion.div
-      ref={ref}
-      layout
-      initial={isNew ? { opacity: 0, x: -30, scale: 0.97 } : { opacity: 0 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 30, scale: 0.97 }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
-      className={clsx(
-        "group relative rounded-md border transition-all duration-200",
-        compact ? "px-3 py-2" : "px-4 py-3",
-        "bg-card/80 border-border/50",
-        isWin && isBigWin && "border-amber-500/30 bg-amber-500/5",
-        isWin && !isBigWin && "border-green-500/15",
-        !isWin && "border-red-500/10"
-      )}
-      data-testid={`card-transaction-${transaction.id}`}
+    <motion.tr
+      ref={ref as any}
+      initial={isNew ? { opacity: 0, y: -20 } : { opacity: 0 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="border-b border-border/30 hover-elevate"
+      data-testid={`row-transaction-${transaction.id}`}
     >
-      {isBigWin && (
-        <div className="absolute inset-0 rounded-md bg-gradient-to-r from-amber-500/5 via-transparent to-amber-500/5 pointer-events-none" />
-      )}
-
-      <div className="flex items-center gap-3 relative z-10">
-        <div className={clsx(
-          "flex items-center justify-center rounded-md flex-shrink-0",
-          compact ? "w-8 h-8" : "w-9 h-9",
-          isWin && isBigWin && "bg-amber-500/15 text-amber-400",
-          isWin && !isBigWin && "bg-green-500/10 text-green-400",
-          !isWin && "bg-red-500/10 text-red-400"
-        )}>
-          <GameIcon className={clsx(compact ? "w-4 h-4" : "w-4.5 h-4.5")} />
+      <td className="py-2.5 px-4">
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-muted-foreground/60" />
+          <span className="text-sm text-muted-foreground" data-testid={`text-username-${transaction.id}`}>
+            Hidden
+          </span>
         </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <User className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-              <span className={clsx(
-                "font-semibold text-foreground/90 truncate",
-                compact ? "text-xs" : "text-sm"
-              )} data-testid={`text-username-${transaction.id}`}>
-                {transaction.username}
-              </span>
-            </div>
-            <span className={clsx(
-              "text-muted-foreground font-mono flex-shrink-0",
-              compact ? "text-[10px]" : "text-xs"
-            )}>
-              {format(new Date(transaction.timestamp), "HH:mm:ss")}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className={clsx(
-              "text-muted-foreground truncate",
-              compact ? "text-[10px]" : "text-xs"
-            )}>
-              {transaction.game}
-            </span>
-            {transaction.multiplier && (
-              <span className={clsx(
-                "font-mono font-bold rounded px-1 py-px flex-shrink-0",
-                compact ? "text-[9px]" : "text-[10px]",
-                isWin && isBigWin && "bg-amber-500/15 text-amber-400",
-                isWin && !isBigWin && "bg-green-500/10 text-green-400",
-                !isWin && "bg-red-500/10 text-red-400"
-              )}>
-                {transaction.multiplier}
-              </span>
-            )}
-          </div>
+      </td>
+      <td className="py-2.5 px-4">
+        <div className="flex items-center gap-2.5">
+          <img
+            src={gameImage}
+            alt={transaction.game}
+            className="w-8 h-8 rounded-md object-cover flex-shrink-0"
+            data-testid={`img-game-${transaction.id}`}
+          />
+          <span className="text-sm font-medium text-foreground" data-testid={`text-game-${transaction.id}`}>
+            {transaction.game}
+          </span>
         </div>
-
-        <div className="text-right flex-shrink-0">
-          <div className={clsx(
-            "font-bold font-mono tabular-nums tracking-tight",
-            compact ? "text-sm" : "text-base",
-            isWin && isBigWin && "text-amber-400 text-glow-sm",
-            isWin && !isBigWin && "text-green-400",
-            !isWin && "text-red-400"
-          )} data-testid={`text-amount-${transaction.id}`}>
-            {isWin ? "+" : "-"}{transaction.currency}{amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-        </div>
-      </div>
-    </motion.div>
+      </td>
+      <td className="py-2.5 px-4">
+        <span className="text-sm text-foreground/80 font-mono" data-testid={`text-bet-amount-${transaction.id}`}>
+          {transaction.currency}{amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      </td>
+      <td className="py-2.5 px-4">
+        <span className="text-sm text-foreground/70 font-mono" data-testid={`text-multiplier-${transaction.id}`}>
+          {multiplier > 0 ? `${multiplier.toFixed(2)}x` : "0.00x"}
+        </span>
+      </td>
+      <td className="py-2.5 px-4 text-right">
+        <span className={clsx(
+          "text-sm font-semibold font-mono",
+          isWin ? "text-green-400" : "text-red-400"
+        )} data-testid={`text-amount-${transaction.id}`}>
+          {isWin ? "+" : "-"}{transaction.currency}{absWinnings.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      </td>
+    </motion.tr>
   );
 });
 
-TransactionCard.displayName = "TransactionCard";
+TransactionRow.displayName = "TransactionRow";

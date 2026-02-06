@@ -5,11 +5,15 @@ import { clsx } from "clsx";
 import { type Transaction } from "@shared/schema";
 
 const CASINO_GAMES = [
-  "Sweet Bonanza", "Gates of Olympus", "Aviator", "Crash",
+  "Sweet Bonanza", "Gates of Olympus", "Gates of Olympus 1000",
+  "Gates of Olympus Super Scatter", "Aviator", "Crash",
   "Roulette", "Blackjack", "Poker", "Baccarat", "Slots",
   "Mines", "Plinko", "Dice", "Limbo", "Big Bass Bonanza",
   "Book of Dead", "Crazy Time", "Lightning Roulette",
-  "Monopoly Live", "Dream Catcher", "Mega Ball"
+  "Monopoly Live", "Dream Catcher", "Mega Ball",
+  "40 Burning Hot", "Black Seven Bell Link",
+  "100 Bulky Dice Golden Coins Link",
+  "VIP Flaming Hot Extreme Bell Link"
 ];
 
 const USERNAMES = [

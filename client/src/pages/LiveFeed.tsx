@@ -1,24 +1,21 @@
-import { useTransactions, useStats } from "@/hooks/use-transactions";
-import { TransactionCard } from "@/components/TransactionCard";
-import { Ticker } from "@/components/Ticker";
-import { StatsBar } from "@/components/StatsBar";
+import { useTransactions } from "@/hooks/use-transactions";
+import { TransactionRow, getWinnings } from "@/components/TransactionCard";
 import { AdminPanel } from "@/components/AdminPanel";
 import { SimulationControl } from "@/components/SimulationControl";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { type Transaction } from "@shared/schema";
 import { AnimatePresence } from "framer-motion";
-import { Loader2, Search, Radio, SlidersHorizontal } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const MAX_FEED_ITEMS = 200;
 
 export default function LiveFeed() {
-  const [filterType, setFilterType] = useState<'WIN' | 'LOSS' | undefined>(undefined);
-  const [search, setSearch] = useState("");
-  const [minAmount, setMinAmount] = useState("");
-  const [tickerSpeed, setTickerSpeed] = useState<1 | 2 | 3>(1);
+  const [activeTab, setActiveTab] = useState<"casino" | "top">("casino");
   const [simulatedTransactions, setSimulatedTransactions] = useState<Transaction[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(true);
 
   const {
     data,
@@ -26,35 +23,73 @@ export default function LiveFeed() {
     hasNextPage,
     isFetchingNextPage,
     isLoading
-  } = useTransactions({ type: filterType, search: search || undefined, limit: 30 });
-
-  const { data: stats, isLoading: statsLoading } = useStats();
+  } = useTransactions({ limit: 50 });
 
   const allTransactions = useMemo(() => {
     const realTx = data?.pages.flatMap(page => page.items) || [];
     const combined = [...simulatedTransactions, ...realTx];
     const seen = new Set<number>();
-    let deduped = combined.filter(tx => {
+    const deduped = combined.filter(tx => {
       if (seen.has(tx.id)) return false;
       seen.add(tx.id);
       return true;
     });
-    if (minAmount) {
-      const min = parseFloat(minAmount);
-      if (!isNaN(min)) {
-        deduped = deduped.filter(tx => Number(tx.amount) >= min);
-      }
-    }
     deduped.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return deduped.slice(0, MAX_FEED_ITEMS);
-  }, [data, simulatedTransactions, minAmount]);
+  }, [data, simulatedTransactions]);
+
+  const topWinners = useMemo(() => {
+    return [...allTransactions]
+      .filter(tx => tx.type === "WIN")
+      .sort((a, b) => getWinnings(b) - getWinnings(a))
+      .slice(0, 50);
+  }, [allTransactions]);
+
+  const displayTransactions = activeTab === "casino" ? allTransactions : topWinners;
 
   const handleSimulate = useCallback((newTx: Transaction[]) => {
     setSimulatedTransactions(prev => [...newTx, ...prev].slice(0, 80));
   }, []);
 
   useEffect(() => {
-    const container = document.getElementById("feed-scroll-container");
+    const container = scrollRef.current;
+    if (!container || !isAutoScrolling) return;
+
+    autoScrollRef.current = setInterval(() => {
+      if (container.scrollTop < container.scrollHeight - container.clientHeight) {
+        container.scrollTop += 1;
+      } else {
+        container.scrollTop = 0;
+      }
+    }, 30);
+
+    return () => {
+      if (autoScrollRef.current) clearInterval(autoScrollRef.current);
+    };
+  }, [isAutoScrolling, displayTransactions.length]);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    let userScrollTimeout: ReturnType<typeof setTimeout>;
+    const handleWheel = () => {
+      setIsAutoScrolling(false);
+      clearTimeout(userScrollTimeout);
+      userScrollTimeout = setTimeout(() => setIsAutoScrolling(true), 5000);
+    };
+
+    container.addEventListener('wheel', handleWheel);
+    container.addEventListener('touchstart', handleWheel);
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('touchstart', handleWheel);
+      clearTimeout(userScrollTimeout);
+    };
+  }, []);
+
+  useEffect(() => {
+    const container = scrollRef.current;
     if (!container) return;
 
     const handleScroll = () => {
@@ -71,132 +106,111 @@ export default function LiveFeed() {
 
   return (
     <div className="h-screen flex flex-col bg-background" data-testid="live-feed-page">
-      <Ticker items={allTransactions} speed={tickerSpeed} />
-      <StatsBar stats={stats} isLoading={statsLoading} />
+      <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col px-4 py-6 overflow-hidden">
+        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+          <div className="flex items-center bg-card rounded-lg p-1 border border-border/50" data-testid="tab-container">
+            <Button
+              variant={activeTab === "casino" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("casino")}
+              className="text-sm font-semibold"
+              data-testid="button-tab-casino"
+            >
+              Casino
+            </Button>
+            <Button
+              variant={activeTab === "top" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("top")}
+              className="text-sm font-semibold"
+              data-testid="button-tab-top"
+            >
+              Top Kazanclar
+            </Button>
+          </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b border-border/50 bg-card/20">
-          <div className="max-w-5xl mx-auto px-4 py-2.5 flex flex-col sm:flex-row items-center gap-2.5 justify-between">
-            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-              <div className="relative flex-1 sm:flex-none sm:w-48">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search player..."
-                  className="pl-8 bg-secondary/50 border-border/50 text-sm"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  data-testid="input-search"
-                />
-              </div>
-
-              <div className="relative w-24">
-                <SlidersHorizontal className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  type="number"
-                  placeholder="Min ₺"
-                  className="pl-8 bg-secondary/50 border-border/50 text-sm"
-                  value={minAmount}
-                  onChange={(e) => setMinAmount(e.target.value)}
-                  data-testid="input-min-amount"
-                />
-              </div>
-
-              <div className="flex bg-secondary/40 rounded-md p-0.5 border border-border/30">
-                <Button
-                  size="sm"
-                  variant={filterType === undefined ? "secondary" : "ghost"}
-                  onClick={() => setFilterType(undefined)}
-                  className="text-xs"
-                  data-testid="button-filter-all"
-                >
-                  All
-                </Button>
-                <Button
-                  size="sm"
-                  variant={filterType === 'WIN' ? "secondary" : "ghost"}
-                  onClick={() => setFilterType('WIN')}
-                  className="text-xs text-green-400"
-                  data-testid="button-filter-win"
-                >
-                  Wins
-                </Button>
-                <Button
-                  size="sm"
-                  variant={filterType === 'LOSS' ? "secondary" : "ghost"}
-                  onClick={() => setFilterType('LOSS')}
-                  className="text-xs text-red-400"
-                  data-testid="button-filter-loss"
-                >
-                  Losses
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
-              <div className="flex items-center gap-1 bg-secondary/40 rounded-md p-0.5 border border-border/30">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium ml-1.5">Ticker</span>
-                {([1, 2, 3] as const).map((s) => (
-                  <Button
-                    key={s}
-                    size="sm"
-                    variant={tickerSpeed === s ? "secondary" : "ghost"}
-                    onClick={() => setTickerSpeed(s)}
-                    className="text-xs font-mono"
-                    data-testid={`button-ticker-speed-${s}`}
-                  >
-                    {s}x
-                  </Button>
-                ))}
-              </div>
-              <SimulationControl onSimulate={handleSimulate} />
-              <AdminPanel />
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <SimulationControl onSimulate={handleSimulate} />
+            <AdminPanel />
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden">
-          <div className="max-w-5xl mx-auto h-full flex flex-col">
-            <div className="flex items-center gap-2 px-4 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-              <Radio className="w-3 h-3 text-green-500 animate-pulse" />
-              <span data-testid="text-live-feed-label">Live Feed</span>
-              <span className="ml-auto font-mono text-muted-foreground/50" data-testid="text-bet-count">
-                {allTransactions.length} bets
-              </span>
-            </div>
+        <div className="flex-1 overflow-hidden rounded-lg border border-border/40">
+          <table className="w-full table-fixed" data-testid="transaction-table">
+            <thead className="sticky top-0 z-20">
+              <tr className="bg-card/80 backdrop-blur-sm border-b border-border/50">
+                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 w-[15%]" data-testid="th-user">
+                  Kullanici
+                </th>
+                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 w-[30%]" data-testid="th-game">
+                  Oyun
+                </th>
+                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 w-[18%]" data-testid="th-bet">
+                  Bahis Miktari
+                </th>
+                <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 w-[15%]" data-testid="th-multiplier">
+                  Carpan
+                </th>
+                <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider py-3 px-4 w-[22%]" data-testid="th-winnings">
+                  Kazanc
+                </th>
+              </tr>
+            </thead>
+          </table>
 
-            <div
-              id="feed-scroll-container"
-              className="flex-1 overflow-y-auto px-4 pb-4 space-y-1.5 scrollbar-hide"
-            >
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
-                  <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
-                  <p className="text-sm" data-testid="text-loading">Connecting to feed...</p>
-                </div>
-              ) : allTransactions.length === 0 ? (
-                <div className="text-center py-20 text-muted-foreground text-sm" data-testid="text-empty-state">
-                  No transactions found. Start simulation to see live data.
-                </div>
-              ) : (
-                <AnimatePresence initial={false} mode="popLayout">
-                  {allTransactions.map((tx) => (
-                    <TransactionCard
-                      key={tx.id}
-                      transaction={tx}
-                      isNew={tx.isSimulation === true}
-                      compact
-                    />
-                  ))}
-                </AnimatePresence>
-              )}
+          <div
+            ref={scrollRef}
+            className="overflow-y-auto scrollbar-hide"
+            style={{ height: 'calc(100% - 41px)' }}
+            data-testid="feed-scroll-container"
+          >
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '30%' }} />
+                <col style={{ width: '18%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '22%' }} />
+              </colgroup>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-20">
+                      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        <p className="text-sm" data-testid="text-loading">Feed yukleniyor...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : displayTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-20">
+                      <p className="text-sm text-muted-foreground" data-testid="text-empty-state">
+                        Islem bulunamadi. Simulasyonu baslatarak canli veri gorebilirsiniz.
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  <AnimatePresence initial={false}>
+                    {displayTransactions.map((tx) => (
+                      <TransactionRow
+                        key={tx.id}
+                        transaction={tx}
+                        isNew={tx.isSimulation === true}
+                      />
+                    ))}
+                  </AnimatePresence>
+                )}
 
-              {isFetchingNextPage && (
-                <div className="py-4 text-center">
-                  <Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" />
-                </div>
-              )}
-            </div>
+                {isFetchingNextPage && (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-center">
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" />
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

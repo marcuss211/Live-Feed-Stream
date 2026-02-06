@@ -22,12 +22,11 @@ Preferred communication style: Simple, everyday language.
 - **Path Aliases**: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
 
 ### Key Frontend Components
-- `LiveFeed` — Main page showing real-time transaction feed with filters (type, search, min amount)
-- `TransactionCard` — Animated card for each transaction (win/loss styling, game icons)
-- `Ticker` — Horizontal scrolling marquee of recent big wins
-- `StatsBar` — Dashboard stats (total P/L, today P/L, 24h P/L, bet count)
+- `LiveFeed` — Main page with table-style casino feed, Casino/Top Kazanclar tabs, auto-scroll
+- `TransactionRow` — Table row for each transaction (Hidden username, game thumbnail, bet amount, multiplier, winnings)
 - `AdminPanel` — Dialog form to manually create transactions
 - `SimulationControl` — Client-side mock transaction generator for demo purposes
+- Game thumbnail images stored in `client/public/images/games/`
 
 ### Backend
 - **Framework**: Express.js on Node.js with TypeScript
