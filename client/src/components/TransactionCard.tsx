@@ -64,47 +64,47 @@ export const TransactionRow = forwardRef<HTMLTableRowElement, TransactionCardPro
   return (
     <motion.tr
       ref={ref as any}
-      initial={isNew ? { opacity: 0, y: -20 } : { opacity: 0 }}
+      initial={isNew ? { opacity: 0, y: 20 } : { opacity: 0 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
+      exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
       className="border-b border-border/30 hover-elevate"
       data-testid={`row-transaction-${transaction.id}`}
     >
-      <td className="py-2.5 px-4">
-        <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-muted-foreground/60" />
-          <span className="text-sm text-muted-foreground" data-testid={`text-username-${transaction.id}`}>
+      <td className="py-2 px-2 sm:py-2.5 sm:px-4">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground/60 flex-shrink-0" />
+          <span className="text-xs sm:text-sm text-muted-foreground" data-testid={`text-username-${transaction.id}`}>
             Hidden
           </span>
         </div>
       </td>
-      <td className="py-2.5 px-4">
-        <div className="flex items-center gap-2.5">
+      <td className="py-2 px-2 sm:py-2.5 sm:px-4">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
           <img
             src={gameImage}
             alt={transaction.game}
-            className="w-8 h-8 rounded-md object-cover flex-shrink-0"
+            className="w-6 h-6 sm:w-8 sm:h-8 rounded-md object-cover flex-shrink-0"
             data-testid={`img-game-${transaction.id}`}
           />
-          <span className="text-sm font-medium text-foreground" data-testid={`text-game-${transaction.id}`}>
+          <span className="text-xs sm:text-sm font-medium text-foreground truncate" data-testid={`text-game-${transaction.id}`}>
             {transaction.game}
           </span>
         </div>
       </td>
-      <td className="py-2.5 px-4">
-        <span className="text-sm text-foreground/80 font-mono" data-testid={`text-bet-amount-${transaction.id}`}>
+      <td className="py-2 px-2 sm:py-2.5 sm:px-4">
+        <span className="text-xs sm:text-sm text-foreground/80 font-mono" data-testid={`text-bet-amount-${transaction.id}`}>
           {transaction.currency}{amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </td>
-      <td className="py-2.5 px-4">
-        <span className="text-sm text-foreground/70 font-mono" data-testid={`text-multiplier-${transaction.id}`}>
+      <td className="py-2 px-2 sm:py-2.5 sm:px-4">
+        <span className="text-xs sm:text-sm text-foreground/70 font-mono" data-testid={`text-multiplier-${transaction.id}`}>
           {multiplier > 0 ? `${multiplier.toFixed(2)}x` : "0.00x"}
         </span>
       </td>
-      <td className="py-2.5 px-4 text-right">
+      <td className="py-2 px-2 sm:py-2.5 sm:px-4 text-right">
         <span className={clsx(
-          "text-sm font-semibold font-mono",
+          "text-xs sm:text-sm font-semibold font-mono",
           isWin ? "text-green-400" : "text-red-400"
         )} data-testid={`text-amount-${transaction.id}`}>
           {isWin ? "+" : "-"}{transaction.currency}{absWinnings.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
