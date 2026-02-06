@@ -50,7 +50,24 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
 
   const hasChanges = isActive !== game.isActive || ladderType !== game.ladderType || customLadder !== (game.customLadder || "");
 
+  const validateLadder = (val: string): string | null => {
+    if (!val.trim()) return null;
+    const nums = val.split(",").map(v => Number(v.trim()));
+    if (nums.some(v => isNaN(v) || v <= 0)) return "Tum degerler pozitif sayi olmalidir";
+    for (let i = 1; i < nums.length; i++) {
+      if (nums[i] <= nums[i - 1]) return "Degerler kucukten buyuge siralanmalidir";
+    }
+    return null;
+  };
+
   const handleSave = () => {
+    if (customLadder.trim()) {
+      const err = validateLadder(customLadder);
+      if (err) {
+        toast({ title: "Hata", description: err, variant: "destructive" });
+        return;
+      }
+    }
     const updates: any = {};
     if (isActive !== game.isActive) updates.isActive = isActive;
     if (ladderType !== game.ladderType) updates.ladderType = ladderType;
@@ -76,9 +93,15 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
         body: buffer,
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Upload failed");
-      toast({ title: "Basarili", description: "Gorsel guncellendi" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(err.message || "Upload failed");
+      }
+      const result = await res.json();
+      if (!result.imagePath) throw new Error("Gorsel kaydedilemedi");
+      toast({ title: "Basarili", description: "Gorsel guncellendi — canli feed'e aninda yansitildi" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/game-images"] });
     } catch {
       toast({ title: "Hata", description: "Gorsel yuklenemedi", variant: "destructive" });
     } finally {
@@ -134,14 +157,17 @@ function GameRow({ game, onSave, isSuperAdmin }: { game: GameConfig; onSave: (ga
       </Select>
 
       <div className="min-w-0">
-        {ladderType === "custom" && (
-          <Input
-            value={customLadder}
-            onChange={(e) => setCustomLadder(e.target.value)}
-            placeholder="1,2,5,10,25,50,100..."
-            className="h-8 text-xs"
-            data-testid={`input-custom-ladder-${game.gameId}`}
-          />
+        <Input
+          value={customLadder}
+          onChange={(e) => setCustomLadder(e.target.value)}
+          placeholder={ladderType === "default" ? "Bos = provider default" : "Bos = provider default ladder"}
+          className="h-8 text-xs"
+          data-testid={`input-custom-ladder-${game.gameId}`}
+        />
+        {customLadder.trim() && (
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {customLadder.split(",").filter(v => v.trim()).length} deger
+          </p>
         )}
       </div>
 
@@ -266,6 +292,7 @@ export default function AdminPanel() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/game-images"] });
       toast({ title: "Basarili", description: "Oyun ayari guncellendi" });
     },
     onError: () => {

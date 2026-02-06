@@ -1,6 +1,6 @@
 import { useTransactions } from "@/hooks/use-transactions";
 import { useTransactionStream } from "@/hooks/use-sse";
-import { TransactionRow } from "@/components/TransactionCard";
+import { TransactionRow, useGameImages } from "@/components/TransactionCard";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { type Transaction } from "@shared/schema";
 import { Loader2 } from "lucide-react";
@@ -12,6 +12,8 @@ export default function LiveFeed() {
   const feedRef = useRef<HTMLDivElement>(null);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const newIdsRef = useRef<Set<number>>(new Set());
+
+  const { data: gameImages } = useGameImages();
 
   const {
     data,
@@ -113,6 +115,7 @@ export default function LiveFeed() {
                   key={tx.id}
                   transaction={tx}
                   isNew={newIdsRef.current.has(tx.id)}
+                  gameImages={gameImages}
                 />
               ))
             )}

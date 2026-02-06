@@ -452,6 +452,19 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/game-images", async (_req, res) => {
+    try {
+      const allGames = await storage.getAllGameConfigs();
+      const map: Record<string, string> = {};
+      for (const g of allGames) {
+        if (g.imagePath) map[g.name] = g.imagePath;
+      }
+      res.json(map);
+    } catch {
+      res.json({});
+    }
+  });
+
   app.get("/api/transactions/stream", (req, res) => {
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
@@ -501,6 +514,11 @@ export async function registerRoutes(
         const vals = parsed.data.customLadder.split(",").map(v => Number(v.trim()));
         if (vals.some(v => isNaN(v) || v <= 0)) {
           return res.status(400).json({ message: "Custom ladder must be comma-separated positive numbers" });
+        }
+        for (let i = 1; i < vals.length; i++) {
+          if (vals[i] <= vals[i - 1]) {
+            return res.status(400).json({ message: "Custom ladder values must be in ascending order" });
+          }
         }
       }
 
@@ -564,11 +582,22 @@ export async function registerRoutes(
           const filePath = path.join(imgDir, filename);
           fs.writeFileSync(filePath, buffer);
 
+          if (!fs.existsSync(filePath)) {
+            return res.status(500).json({ message: "Dosya kaydedilemedi" });
+          }
+
           const imagePath = `/images/games/${filename}?v=${Date.now()}`;
           const existing = await storage.getGameConfig(gameId);
-          const oldPath = existing?.imagePath || "";
+          if (!existing) {
+            return res.status(404).json({ message: "Oyun bulunamadi" });
+          }
+          const oldPath = existing.imagePath || "";
 
-          await storage.updateGameConfig(gameId, { imagePath });
+          const updated = await storage.updateGameConfig(gameId, { imagePath });
+          if (!updated) {
+            return res.status(500).json({ message: "Veritabani guncellenemedi" });
+          }
+
           await storage.createAuditLog({
             adminUserId: userId,
             adminEmail: userEmail,
@@ -581,7 +610,7 @@ export async function registerRoutes(
 
           invalidateCache();
           await refreshConfigCache();
-          res.json({ imagePath });
+          res.json({ imagePath, success: true });
         } catch (err) {
           console.error("Image upload error:", err);
           res.status(500).json({ message: "Upload failed" });

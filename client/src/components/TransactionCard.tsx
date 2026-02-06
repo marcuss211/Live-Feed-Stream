@@ -2,39 +2,7 @@ import { memo, useState, useEffect } from "react";
 import { type Transaction } from "@shared/schema";
 import { Users } from "lucide-react";
 import { clsx } from "clsx";
-
-const GAME_IMAGES: Record<string, string> = {
-  "Gates of Olympus": "/images/games/gates-of-olympus.png",
-  "Sweet Bonanza": "/images/games/sweet-bonanza.png",
-  "Big Bass Bonanza": "/images/games/big-bass-bonanza.png",
-  "Book of Dead": "/images/games/book-of-dead.png",
-  "Wolf Gold": "/images/games/wolf-gold.png",
-  "Sugar Rush": "/images/games/sugar-rush.png",
-  "Starlight Princess": "/images/games/starlight-princess.png",
-  "Wanted Dead or a Wild": "/images/games/wanted-dead-or-wild.png",
-  "The Dog House": "/images/games/the-dog-house.png",
-  "Fruit Party": "/images/games/fruit-party.png",
-  "Fire Joker": "/images/games/fire-joker.png",
-  "Legacy of Dead": "/images/games/legacy-of-dead.png",
-  "Gates of Gatotkaca": "/images/games/gates-of-gatotkaca.png",
-  "Aztec Gems": "/images/games/aztec-gems.png",
-  "Madame Destiny Megaways": "/images/games/madame-destiny-megaways.png",
-  "Extra Chilli Megaways": "/images/games/extra-chilli-megaways.png",
-  "Floating Dragon": "/images/games/floating-dragon.png",
-  "Reactoonz": "/images/games/reactoonz.png",
-  "Jammin' Jars": "/images/games/jammin-jars.png",
-  "Bonanza Megaways": "/images/games/bonanza-megaways.png",
-  "Starburst": "/images/games/starburst.png",
-  "Gonzo's Quest": "/images/games/gonzos-quest.png",
-  "Dead or Alive 2": "/images/games/dead-or-alive-2.png",
-  "Razor Shark": "/images/games/razor-shark.png",
-  "Rise of Olympus": "/images/games/rise-of-olympus.png",
-  "Mental": "/images/games/mental.png",
-  "Buffalo King Megaways": "/images/games/buffalo-king-megaways.png",
-  "Money Train 2": "/images/games/money-train-2.png",
-  "Eye of Horus": "/images/games/eye-of-horus.png",
-  "Joker's Jewels": "/images/games/jokers-jewels.png",
-};
+import { useQuery } from "@tanstack/react-query";
 
 function parseMultiplier(m: string | null | undefined): number {
   if (!m) return 0;
@@ -51,16 +19,25 @@ export function getWinnings(tx: Transaction): number {
   return -bet;
 }
 
+export function useGameImages() {
+  return useQuery<Record<string, string>>({
+    queryKey: ["/api/game-images"],
+    refetchInterval: 10000,
+    staleTime: 5000,
+  });
+}
+
 interface TransactionRowProps {
   transaction: Transaction;
   isNew?: boolean;
+  gameImages?: Record<string, string>;
 }
 
-export const TransactionRow = memo(function TransactionRow({ transaction, isNew }: TransactionRowProps) {
+export const TransactionRow = memo(function TransactionRow({ transaction, isNew, gameImages }: TransactionRowProps) {
   const [highlight, setHighlight] = useState(isNew);
   const isWin = transaction.type === "WIN";
   const amount = Number(transaction.amount);
-  const gameImage = GAME_IMAGES[transaction.game] || "/images/games/slots.png";
+  const gameImage = gameImages?.[transaction.game] || "/images/games/slots.png";
   const multiplier = parseMultiplier(transaction.multiplier);
   const winnings = getWinnings(transaction);
   const absWinnings = Math.abs(winnings);
