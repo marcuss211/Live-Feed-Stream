@@ -5,37 +5,70 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 
-const CASINO_GAMES = [
-  "Gates of Olympus",
-  "Sweet Bonanza",
-  "Big Bass Bonanza",
-  "Book of Dead",
-  "Wolf Gold",
-  "Sugar Rush",
-  "Starlight Princess",
-  "Wanted Dead or a Wild",
-  "The Dog House",
-  "Fruit Party",
-  "Fire Joker",
-  "Legacy of Dead",
-  "Gates of Gatotkaca",
-  "Aztec Gems",
-  "Madame Destiny Megaways",
-  "Extra Chilli Megaways",
-  "Floating Dragon",
-  "Reactoonz",
-  "Jammin' Jars",
-  "Bonanza Megaways",
-  "Starburst",
-  "Gonzo's Quest",
-  "Dead or Alive 2",
-  "Razor Shark",
-  "Rise of Olympus",
-  "Mental",
-  "Buffalo King Megaways",
-  "Money Train 2",
-  "Eye of Horus",
-  "Joker's Jewels",
+type Provider = "pragmatic" | "playngo" | "netent" | "other";
+
+interface GameDef {
+  name: string;
+  provider: Provider;
+}
+
+const GAMES: GameDef[] = [
+  { name: "Gates of Olympus", provider: "pragmatic" },
+  { name: "Sweet Bonanza", provider: "pragmatic" },
+  { name: "Big Bass Bonanza", provider: "pragmatic" },
+  { name: "Sugar Rush", provider: "pragmatic" },
+  { name: "Starlight Princess", provider: "pragmatic" },
+  { name: "The Dog House", provider: "pragmatic" },
+  { name: "Fruit Party", provider: "pragmatic" },
+  { name: "Gates of Gatotkaca", provider: "pragmatic" },
+  { name: "Buffalo King Megaways", provider: "pragmatic" },
+  { name: "Madame Destiny Megaways", provider: "pragmatic" },
+  { name: "Floating Dragon", provider: "pragmatic" },
+  { name: "Aztec Gems", provider: "pragmatic" },
+  { name: "Wolf Gold", provider: "pragmatic" },
+  { name: "Wanted Dead or a Wild", provider: "pragmatic" },
+  { name: "Extra Chilli Megaways", provider: "pragmatic" },
+  { name: "Joker's Jewels", provider: "pragmatic" },
+  { name: "Book of Dead", provider: "playngo" },
+  { name: "Fire Joker", provider: "playngo" },
+  { name: "Legacy of Dead", provider: "playngo" },
+  { name: "Reactoonz", provider: "playngo" },
+  { name: "Rise of Olympus", provider: "playngo" },
+  { name: "Mental", provider: "playngo" },
+  { name: "Jammin' Jars", provider: "playngo" },
+  { name: "Starburst", provider: "netent" },
+  { name: "Gonzo's Quest", provider: "netent" },
+  { name: "Dead or Alive 2", provider: "netent" },
+  { name: "Bonanza Megaways", provider: "other" },
+  { name: "Razor Shark", provider: "other" },
+  { name: "Money Train 2", provider: "other" },
+  { name: "Eye of Horus", provider: "other" },
+];
+
+const GAMES_BY_PROVIDER: Record<Provider, GameDef[]> = {
+  pragmatic: GAMES.filter(g => g.provider === "pragmatic"),
+  playngo: GAMES.filter(g => g.provider === "playngo"),
+  netent: GAMES.filter(g => g.provider === "netent"),
+  other: GAMES.filter(g => g.provider === "other"),
+};
+
+const PROVIDER_WEIGHTS: { provider: Provider; weight: number }[] = [
+  { provider: "pragmatic", weight: 70 },
+  { provider: "playngo", weight: 15 },
+  { provider: "netent", weight: 8 },
+  { provider: "other", weight: 7 },
+];
+
+const PRAGMATIC_BET_GAMES = new Set([
+  "Gates of Olympus", "Sweet Bonanza", "Big Bass Bonanza",
+  "Sugar Rush", "Starlight Princess", "The Dog House",
+  "Fruit Party", "Gates of Gatotkaca", "Buffalo King Megaways",
+]);
+
+const PRAGMATIC_LADDER = [
+  1,2,3,4,5,6,7,8,9,10,12,14,16,18,20,30,40,50,60,70,80,90,100,
+  120,140,160,200,240,280,300,320,360,400,500,600,700,800,900,1000,
+  1200,1400,1600,1800,2000
 ];
 
 const USERNAMES = [
@@ -45,24 +78,6 @@ const USERNAMES = [
   "Celik_19", "Gumus_64", "Ates_37", "Dalga_82", "Kaplan_11",
   "Bora_53", "Yilmaz_96", "Duman_28", "Elmas_70", "Kurt_15",
   "Simsek_49", "Pars_86", "Volkan_31", "Aslan_63", "Sahin_07",
-];
-
-const PRAGMATIC_GAMES = new Set([
-  "Gates of Olympus",
-  "Sweet Bonanza",
-  "Big Bass Bonanza",
-  "Sugar Rush",
-  "Starlight Princess",
-  "The Dog House",
-  "Fruit Party",
-  "Gates of Gatotkaca",
-  "Buffalo King Megaways",
-]);
-
-const PRAGMATIC_LADDER = [
-  1,2,3,4,5,6,7,8,9,10,12,14,16,18,20,30,40,50,60,70,80,90,100,
-  120,140,160,200,240,280,300,320,360,400,500,600,700,800,900,1000,
-  1200,1400,1600,1800,2000,2500,3000,4000,5000,6000,8000,10000
 ];
 
 const sseClients = new Set<Response>();
@@ -75,13 +90,105 @@ function broadcastTransaction(tx: object) {
 }
 
 let whaleCooldown = 0;
+let megaWinCooldown = 0;
+let eventsSinceVisibleWin = 0;
 const recentUsers: string[] = [];
 const userBetHistory: Map<string, number> = new Map();
 const userLadderIndex: Map<string, number> = new Map();
 
+const recentGames: string[] = [];
+const recentProviders: Provider[] = [];
+const last20Games: string[] = [];
+
+interface ComboKey { game: string; bet: number; multiplier: string }
+const recentCombos: ComboKey[] = [];
+
+function getDailySeed(): number {
+  const d = new Date();
+  const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  let hash = 0;
+  for (let i = 0; i < dateStr.length; i++) {
+    hash = ((hash << 5) - hash) + dateStr.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function seededRandom(seed: number, index: number): number {
+  let x = Math.sin(seed + index * 9301 + 49297) * 233280;
+  return x - Math.floor(x);
+}
+
+let eventCounter = 0;
+
+function pickProvider(): Provider {
+  const last4 = recentProviders.slice(-4);
+  const blockedProvider = (last4.length === 4 && last4.every(p => p === last4[0])) ? last4[0] : null;
+
+  const available = blockedProvider
+    ? PROVIDER_WEIGHTS.filter(pw => pw.provider !== blockedProvider)
+    : PROVIDER_WEIGHTS;
+
+  const totalWeight = available.reduce((s, pw) => s + pw.weight, 0);
+  let roll = Math.random() * totalWeight;
+  let selected: Provider = available[0].provider;
+
+  for (const pw of available) {
+    if (roll < pw.weight) {
+      selected = pw.provider;
+      break;
+    }
+    roll -= pw.weight;
+  }
+
+  return selected;
+}
+
+function pickGame(): GameDef {
+  const provider = pickProvider();
+  const pool = GAMES_BY_PROVIDER[provider];
+
+  const lastGame = recentGames.length > 0 ? recentGames[recentGames.length - 1] : null;
+  const lastTwoSame = recentGames.length >= 2 &&
+    recentGames[recentGames.length - 1] === recentGames[recentGames.length - 2];
+
+  const seed = getDailySeed();
+  let candidates = pool.map(g => {
+    let weight = 1.0;
+    if (last20Games.includes(g.name)) {
+      weight *= 0.7;
+    }
+    weight *= (0.8 + seededRandom(seed, g.name.length + eventCounter) * 0.4);
+    if (lastTwoSame && g.name === lastGame) {
+      weight = 0;
+    }
+    return { game: g, weight };
+  }).filter(c => c.weight > 0);
+
+  if (candidates.length === 0) {
+    candidates = pool.map(g => ({ game: g, weight: 1 }));
+  }
+
+  const totalWeight = candidates.reduce((s, c) => s + c.weight, 0);
+  let r = Math.random() * totalWeight;
+  let picked = candidates[0].game;
+  for (const c of candidates) {
+    if (r < c.weight) { picked = c.game; break; }
+    r -= c.weight;
+  }
+
+  recentGames.push(picked.name);
+  if (recentGames.length > 5) recentGames.shift();
+  recentProviders.push(picked.provider);
+  if (recentProviders.length > 5) recentProviders.shift();
+  last20Games.push(picked.name);
+  if (last20Games.length > 20) last20Games.shift();
+
+  return picked;
+}
+
 function pickNaturalBetAmount(min: number, max: number): number {
   const raw = min + Math.random() * (max - min);
-
   if (raw < 20) return Math.round(raw);
   if (raw < 100) {
     const rounded = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 80, 100];
@@ -126,19 +233,11 @@ function pickPragmaticLadderBet(): number {
   let minIdx: number, maxIdx: number;
 
   if (roll < 70) {
-    [minIdx, maxIdx] = ladderIdxRange(5, 250);
+    [minIdx, maxIdx] = ladderIdxRange(5, 200);
   } else if (roll < 90) {
-    [minIdx, maxIdx] = ladderIdxRange(250, 1500);
-  } else if (roll < 97) {
-    [minIdx, maxIdx] = ladderIdxRange(1500, 7500);
-  } else if (roll < 99.5) {
-    [minIdx, maxIdx] = ladderIdxRange(7500, 10000);
+    [minIdx, maxIdx] = ladderIdxRange(200, 1000);
   } else {
-    if (whaleCooldown > 0) {
-      [minIdx, maxIdx] = ladderIdxRange(1500, 5000);
-    } else {
-      [minIdx, maxIdx] = ladderIdxRange(5000, 10000);
-    }
+    [minIdx, maxIdx] = ladderIdxRange(1000, 2000);
   }
 
   const idx = minIdx + Math.floor(Math.random() * (maxIdx - minIdx + 1));
@@ -176,7 +275,6 @@ function applyPragmaticUserBehavior(username: string, freshLadderBet: number): n
 
 function generateBetAmount(): number {
   const roll = Math.random() * 100;
-
   if (roll < 70) {
     return pickNaturalBetAmount(5, 250);
   } else if (roll < 90) {
@@ -194,30 +292,45 @@ function generateBetAmount(): number {
   }
 }
 
-function generateOutcome(betAmount: number): { type: "WIN" | "LOSS"; multiplier: string | undefined } {
+function generateOutcome(betAmount: number, forceVisibleWin: boolean): { type: "WIN" | "LOSS"; multiplier: string | undefined } {
+  if (forceVisibleWin) {
+    const mult = 5 + Math.random() * 15;
+    const rounded = Math.round(mult * 10) / 10;
+    return { type: "WIN", multiplier: `${rounded}x` };
+  }
+
   const roll = Math.random() * 100;
 
-  if (roll < 58) {
+  if (roll < 50) {
     return { type: "LOSS", multiplier: undefined };
   }
 
   let multiplier: number;
 
-  if (roll < 90) {
-    multiplier = 1.1 + Math.random() * 2.9;
-  } else if (roll < 98) {
+  if (roll < 85) {
+    multiplier = 1.2 + Math.random() * 2.8;
+  } else if (roll < 97) {
     multiplier = 4 + Math.random() * 16;
-  } else if (roll < 99.8) {
-    if (betAmount > 5000) {
+  } else if (roll < 99.5) {
+    if (betAmount > 2000) {
       multiplier = 20 + Math.random() * 30;
     } else {
-      multiplier = 20 + Math.random() * 100;
+      multiplier = 20 + Math.random() * 80;
     }
   } else {
-    if (betAmount > 2000) {
-      multiplier = 120 + Math.random() * 80;
+    if (megaWinCooldown > 0) {
+      if (betAmount > 2000) {
+        multiplier = 20 + Math.random() * 30;
+      } else {
+        multiplier = 20 + Math.random() * 80;
+      }
     } else {
-      multiplier = 120 + Math.random() * 880;
+      megaWinCooldown = 80;
+      if (betAmount > 2000) {
+        multiplier = 100 + Math.random() * 100;
+      } else {
+        multiplier = 100 + Math.random() * 900;
+      }
     }
   }
 
@@ -228,7 +341,6 @@ function generateOutcome(betAmount: number): { type: "WIN" | "LOSS"; multiplier:
 function pickUsername(): string {
   let candidate: string;
   let attempts = 0;
-
   do {
     candidate = USERNAMES[Math.floor(Math.random() * USERNAMES.length)];
     attempts++;
@@ -236,7 +348,6 @@ function pickUsername(): string {
 
   recentUsers.push(candidate);
   if (recentUsers.length > 10) recentUsers.shift();
-
   return candidate;
 }
 
@@ -252,16 +363,37 @@ function applyUserBehavior(username: string, baseBet: number): number {
   return baseBet;
 }
 
+function isComboRecent(game: string, bet: number, multiplier: string | undefined): boolean {
+  if (!multiplier) return false;
+  const key = `${game}|${bet}|${multiplier}`;
+  const last60 = recentCombos.slice(-60);
+  for (const c of last60) {
+    if (`${c.game}|${c.bet}|${c.multiplier}` === key) return true;
+  }
+  return false;
+}
+
+function isComboInLast100(game: string, bet: number, multiplier: string | undefined): boolean {
+  if (!multiplier) return false;
+  const key = `${game}|${bet}|${multiplier}`;
+  for (const c of recentCombos) {
+    if (`${c.game}|${c.bet}|${c.multiplier}` === key) return true;
+  }
+  return false;
+}
+
 function generateMockTransaction() {
+  eventCounter++;
   if (whaleCooldown > 0) whaleCooldown--;
+  if (megaWinCooldown > 0) megaWinCooldown--;
+  eventsSinceVisibleWin++;
 
   const username = pickUsername();
-  const game = CASINO_GAMES[Math.floor(Math.random() * CASINO_GAMES.length)];
-  const isPragmatic = PRAGMATIC_GAMES.has(game);
+  const gameDef = pickGame();
+  const isPragmaticBet = PRAGMATIC_BET_GAMES.has(gameDef.name);
 
   let finalBet: number;
-
-  if (isPragmatic) {
+  if (isPragmaticBet) {
     const ladderBet = pickPragmaticLadderBet();
     finalBet = applyPragmaticUserBehavior(username, ladderBet);
   } else {
@@ -269,14 +401,38 @@ function generateMockTransaction() {
     finalBet = Math.max(5, applyUserBehavior(username, rawBet));
   }
 
-  const outcome = generateOutcome(finalBet);
+  const forceVisibleWin = eventsSinceVisibleWin >= 15 + Math.floor(seededRandom(getDailySeed(), eventCounter) * 11);
+
+  let outcome = generateOutcome(finalBet, forceVisibleWin);
+
+  if (!forceVisibleWin) {
+    let attempts = 0;
+    while (attempts < 3 && outcome.type === "WIN" && outcome.multiplier) {
+      if (isComboRecent(gameDef.name, finalBet, outcome.multiplier)) {
+        outcome = generateOutcome(finalBet, false);
+        attempts++;
+      } else if (isComboInLast100(gameDef.name, finalBet, outcome.multiplier) && Math.random() < 0.4) {
+        outcome = generateOutcome(finalBet, false);
+        attempts++;
+      } else {
+        break;
+      }
+    }
+  }
+
+  if (outcome.type === "WIN" && outcome.multiplier) {
+    const mult = parseFloat(outcome.multiplier.replace('x', ''));
+    if (mult >= 5) eventsSinceVisibleWin = 0;
+    recentCombos.push({ game: gameDef.name, bet: finalBet, multiplier: outcome.multiplier });
+    if (recentCombos.length > 100) recentCombos.shift();
+  }
 
   return {
     username,
     amount: finalBet.toFixed(2),
     currency: "₺",
     type: outcome.type,
-    game,
+    game: gameDef.name,
     multiplier: outcome.multiplier,
   };
 }

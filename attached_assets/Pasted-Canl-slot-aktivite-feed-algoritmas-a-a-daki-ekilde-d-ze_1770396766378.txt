@@ -1,0 +1,80 @@
+Canlı slot aktivite feed algoritması aşağıdaki şekilde düzenlenecektir.
+
+1) Oyun seçimi ağırlıkları (weighted selection)
+
+Feed’de oyun seçimi aşağıdaki ağırlıklara göre yapılacaktır:
+
+%70 Pragmatic Play (listede Pragmatic olan oyunlar)
+
+%15 Play’n GO
+
+%8 NetEnt
+
+%7 Diğer sağlayıcılar (Hacksaw, BTG, Push, Relax, Microgaming vb.)
+
+Kurallar:
+
+Aynı oyun maksimum 2 kez üst üste gelebilir.
+
+Aynı provider maksimum 4 event üst üste gelebilir; sonraki event farklı provider’dan seçilecektir.
+
+Son 20 event içinde görünen oyunların seçilme olasılığı %30 azaltılacaktır (rotation effect).
+
+2) Pragmatic Play bahis üretim mantığı
+
+Pragmatic oyunlarında bahis değerleri yalnızca aşağıdaki bet ladder üzerinden üretilecektir:
+
+[1,2,3,4,5,6,7,8,9,10,12,14,16,18,20,30,40,50,60,70,80,90,100,120,140,160,200,240,280,300,320,360,400,500,600,700,800,900,1000,1200,1400,1600,1800,2000]
+
+Kurallar:
+
+Ladder dışı bahis değerleri üretilmeyecektir.
+
+Aynı oyuncu tekrar görünüyorsa bahis ladder üzerinde:
+
+%50 aynı step
+
+%30 ±1 step
+
+%15 ±2 step
+
+%5 ±3 step
+
+1000+ bahis seviyelerinde değişimler çoğunlukla aynı veya ±1 step olacaktır.
+
+3) Günlük varyasyon ve tekrar önleme (anti-repeat)
+
+Feed üretimi günlük seed kullanacaktır:
+seed = YYYYMMDD
+
+Aynı oyun + bet + multiplier kombinasyonunun tekrar üretilebilmesi için minimum 60 event cooldown uygulanacaktır.
+
+Son 100 event içinde görülen aynı kombinasyonların yeniden seçilme olasılığı %40 azaltılacaktır.
+
+4) Kazanç dağılımı (visible win balance)
+
+Feed’de kazançlar kullanıcı ilgisini artıracak şekilde ancak gerçekçi dağılımla üretilecektir:
+
+%50 kayıp
+
+%35 küçük kazanç (1.2x – 4x)
+
+%12 orta kazanç (4x – 20x)
+
+%2.5 büyük kazanç (20x – 100x)
+
+%0.5 çok büyük kazanç (100x+)
+
+Ek kurallar:
+
+Büyük çarpanlar çoğunlukla küçük bahislerde gösterilir.
+
+2000+ bahislerde 200x+ çarpan çok nadir üretilir.
+
+Her 15–25 event içinde en az bir görünür kazanç (5x+) oluşması hedeflenir.
+
+Çok büyük kazanç eventleri arasında minimum 80 event mesafe bırakılır.
+
+Amaç
+
+Pragmatic oyunlarının ağırlıklı olduğu, gerçek Pragmatic bahis davranışına uygun bet ladder kullanan, her gün doğal şekilde değişen ve aynı kazanç kombinasyonlarını sık tekrar etmeyen, kullanıcıya gerçek oyuncu aktivitesi hissi veren bir canlı slot aktivite feed sistemi oluşturmak.
