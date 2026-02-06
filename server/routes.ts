@@ -47,6 +47,24 @@ const USERNAMES = [
   "Simsek_49", "Pars_86", "Volkan_31", "Aslan_63", "Sahin_07",
 ];
 
+const PRAGMATIC_GAMES = new Set([
+  "Gates of Olympus",
+  "Sweet Bonanza",
+  "Big Bass Bonanza",
+  "Sugar Rush",
+  "Starlight Princess",
+  "The Dog House",
+  "Fruit Party",
+  "Gates of Gatotkaca",
+  "Buffalo King Megaways",
+]);
+
+const PRAGMATIC_LADDER = [
+  1,2,3,4,5,6,7,8,9,10,12,14,16,18,20,30,40,50,60,70,80,90,100,
+  120,140,160,200,240,280,300,320,360,400,500,600,700,800,900,1000,
+  1200,1400,1600,1800,2000,2500,3000,4000,5000,6000,8000,10000
+];
+
 const sseClients = new Set<Response>();
 
 function broadcastTransaction(tx: object) {
@@ -59,6 +77,7 @@ function broadcastTransaction(tx: object) {
 let whaleCooldown = 0;
 const recentUsers: string[] = [];
 const userBetHistory: Map<string, number> = new Map();
+const userLadderIndex: Map<string, number> = new Map();
 
 function pickNaturalBetAmount(min: number, max: number): number {
   const raw = min + Math.random() * (max - min);
@@ -88,6 +107,71 @@ function pickNaturalBetAmount(min: number, max: number): number {
   const base = Math.round(raw / 1000) * 1000;
   const jitter = Math.random() < 0.15 ? Math.round((Math.random() - 0.5) * 500) : 0;
   return Math.max(1000, base + jitter);
+}
+
+function ladderIdxRange(minVal: number, maxVal: number): [number, number] {
+  let lo = 0;
+  let hi = PRAGMATIC_LADDER.length - 1;
+  for (let i = 0; i < PRAGMATIC_LADDER.length; i++) {
+    if (PRAGMATIC_LADDER[i] >= minVal) { lo = i; break; }
+  }
+  for (let i = PRAGMATIC_LADDER.length - 1; i >= 0; i--) {
+    if (PRAGMATIC_LADDER[i] <= maxVal) { hi = i; break; }
+  }
+  return [lo, hi];
+}
+
+function pickPragmaticLadderBet(): number {
+  const roll = Math.random() * 100;
+  let minIdx: number, maxIdx: number;
+
+  if (roll < 70) {
+    [minIdx, maxIdx] = ladderIdxRange(5, 250);
+  } else if (roll < 90) {
+    [minIdx, maxIdx] = ladderIdxRange(250, 1500);
+  } else if (roll < 97) {
+    [minIdx, maxIdx] = ladderIdxRange(1500, 7500);
+  } else if (roll < 99.5) {
+    [minIdx, maxIdx] = ladderIdxRange(7500, 10000);
+  } else {
+    if (whaleCooldown > 0) {
+      [minIdx, maxIdx] = ladderIdxRange(1500, 5000);
+    } else {
+      [minIdx, maxIdx] = ladderIdxRange(5000, 10000);
+    }
+  }
+
+  const idx = minIdx + Math.floor(Math.random() * (maxIdx - minIdx + 1));
+  return PRAGMATIC_LADDER[Math.min(idx, PRAGMATIC_LADDER.length - 1)];
+}
+
+function applyPragmaticUserBehavior(username: string, freshLadderBet: number): number {
+  const freshIdx = PRAGMATIC_LADDER.indexOf(freshLadderBet);
+  const lastIdx = userLadderIndex.get(username);
+
+  if (lastIdx === undefined || !recentUsers.slice(-6).includes(username)) {
+    userLadderIndex.set(username, freshIdx);
+    return freshLadderBet;
+  }
+
+  const roll = Math.random() * 100;
+  let stepDelta: number;
+  const isHighBet = PRAGMATIC_LADDER[lastIdx] >= 1000;
+
+  if (isHighBet) {
+    if (roll < 50) stepDelta = 0;
+    else if (roll < 80) stepDelta = (Math.random() < 0.5 ? -1 : 1);
+    else stepDelta = 0;
+  } else {
+    if (roll < 50) stepDelta = 0;
+    else if (roll < 80) stepDelta = (Math.random() < 0.5 ? -1 : 1);
+    else if (roll < 95) stepDelta = (Math.random() < 0.5 ? -2 : 2);
+    else stepDelta = (Math.random() < 0.5 ? -3 : 3);
+  }
+
+  const newIdx = Math.max(0, Math.min(PRAGMATIC_LADDER.length - 1, lastIdx + stepDelta));
+  userLadderIndex.set(username, newIdx);
+  return PRAGMATIC_LADDER[newIdx];
 }
 
 function generateBetAmount(): number {
@@ -172,9 +256,19 @@ function generateMockTransaction() {
   if (whaleCooldown > 0) whaleCooldown--;
 
   const username = pickUsername();
-  const rawBet = generateBetAmount();
-  const betAmount = applyUserBehavior(username, rawBet);
-  const finalBet = Math.max(5, betAmount);
+  const game = CASINO_GAMES[Math.floor(Math.random() * CASINO_GAMES.length)];
+  const isPragmatic = PRAGMATIC_GAMES.has(game);
+
+  let finalBet: number;
+
+  if (isPragmatic) {
+    const ladderBet = pickPragmaticLadderBet();
+    finalBet = applyPragmaticUserBehavior(username, ladderBet);
+  } else {
+    const rawBet = generateBetAmount();
+    finalBet = Math.max(5, applyUserBehavior(username, rawBet));
+  }
+
   const outcome = generateOutcome(finalBet);
 
   return {
@@ -182,7 +276,7 @@ function generateMockTransaction() {
     amount: finalBet.toFixed(2),
     currency: "₺",
     type: outcome.type,
-    game: CASINO_GAMES[Math.floor(Math.random() * CASINO_GAMES.length)],
+    game,
     multiplier: outcome.multiplier,
   };
 }

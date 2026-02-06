@@ -64,6 +64,7 @@ Preferred communication style: Simple, everyday language.
 - **User behavior**: Same user won't appear back-to-back; returning users' bet amounts drift gradually (human simulation)
 - **Natural amounts**: Bet values snap to clean numbers (₺50, ₺75, ₺250, ₺2,750) with slight jitter, not random decimals
 - **High-bet restrictions**: Big multipliers (200x+) are very rare on high bets (>₺5,000)
+- **Pragmatic Play ladder**: 9 Pragmatic games (Gates of Olympus, Sweet Bonanza, Big Bass Bonanza, Sugar Rush, Starlight Princess, The Dog House, Fruit Party, Gates of Gatotkaca, Buffalo King Megaways) use a fixed bet ladder [1,2,...,10000] instead of random amounts. Returning users drift ±1-3 steps on the ladder (more stable at 1000+)
 
 ### Database
 - **Database**: PostgreSQL (required, connected via `DATABASE_URL` environment variable)
