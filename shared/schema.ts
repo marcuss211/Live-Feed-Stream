@@ -32,6 +32,7 @@ export const gameConfigs = pgTable("game_configs", {
   isActive: boolean("is_active").default(true).notNull(),
   ladderType: text("ladder_type").default("default").notNull(),
   customLadder: text("custom_ladder"),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
 });
 
 export const insertGameConfigSchema = createInsertSchema(gameConfigs).omit({ id: true });
