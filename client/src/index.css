@@ -268,20 +268,44 @@
   .feed-header,
   .feed-row {
     grid-template-columns: 70px 1fr 80px 70px;
+    min-height: 44px;
   }
 
   @media (min-width: 640px) {
     .feed-header,
     .feed-row {
       grid-template-columns: 100px 1fr 120px 80px 140px;
+      min-height: 48px;
     }
   }
 
   @media (max-width: 479px) {
     .feed-header,
     .feed-row {
-      grid-template-columns: 55px 1fr 70px 80px;
+      grid-template-columns: 20% 40% 20% 20%;
+      min-height: 42px;
     }
+  }
+
+  .feed-game-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+
+  @media (max-width: 479px) {
+    .feed-game-name {
+      -webkit-line-clamp: 2;
+      line-height: 1.2;
+    }
+  }
+
+  .feed-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   @keyframes feed-slide-in {
@@ -297,6 +321,7 @@
 
   .feed-row-enter {
     animation: feed-slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    will-change: transform, opacity;
   }
 
   @keyframes feed-highlight {

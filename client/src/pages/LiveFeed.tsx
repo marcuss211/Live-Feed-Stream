@@ -76,19 +76,19 @@ export default function LiveFeed() {
       <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col px-2 sm:px-4 py-2 sm:py-4 overflow-hidden">
         <div className="flex-1 overflow-hidden rounded-md border border-border/40 flex flex-col">
           <div className="feed-header grid items-center bg-card/80 backdrop-blur-sm border-b border-border/50 sticky top-0 z-20">
-            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-2 sm:px-3" data-testid="th-user">
+            <div className="text-[9px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-1.5 sm:py-2 px-1.5 sm:px-3" data-testid="th-user">
               Kullanici
             </div>
-            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-1 sm:px-3" data-testid="th-game">
+            <div className="text-[9px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-1.5 sm:py-2 px-1 sm:px-3" data-testid="th-game">
               Oyun
             </div>
-            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-1 sm:px-3" data-testid="th-bet">
+            <div className="text-[9px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-1.5 sm:py-2 px-1 sm:px-3 text-right sm:text-left" data-testid="th-bet">
               Bahis
             </div>
-            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-1 sm:px-3 hidden xs:block" data-testid="th-multiplier">
+            <div className="text-[9px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-1.5 sm:py-2 px-1 sm:px-3 hidden xs:block" data-testid="th-multiplier">
               Carpan
             </div>
-            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-1 sm:px-3 text-right" data-testid="th-winnings">
+            <div className="text-[9px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-1.5 sm:py-2 px-1 sm:px-3 text-right" data-testid="th-winnings">
               Kazanc
             </div>
           </div>
