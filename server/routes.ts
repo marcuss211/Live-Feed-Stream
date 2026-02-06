@@ -6,23 +6,45 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 
 const CASINO_GAMES = [
-  "Sweet Bonanza", "Gates of Olympus", "Gates of Olympus 1000",
-  "Gates of Olympus Super Scatter", "Aviator", "Crash",
-  "Roulette", "Blackjack", "Poker", "Baccarat", "Slots",
-  "Mines", "Plinko", "Dice", "Limbo", "Big Bass Bonanza",
-  "Book of Dead", "Crazy Time", "Lightning Roulette",
-  "Monopoly Live", "Dream Catcher", "Mega Ball",
-  "40 Burning Hot", "Black Seven Bell Link",
-  "100 Bulky Dice Golden Coins Link",
-  "VIP Flaming Hot Extreme Bell Link"
+  "Gates of Olympus",
+  "Sweet Bonanza",
+  "Big Bass Bonanza",
+  "Book of Dead",
+  "Wolf Gold",
+  "Sugar Rush",
+  "Starlight Princess",
+  "Wanted Dead or a Wild",
+  "The Dog House",
+  "Fruit Party",
+  "Fire Joker",
+  "Legacy of Dead",
+  "Gates of Gatotkaca",
+  "Aztec Gems",
+  "Madame Destiny Megaways",
+  "Extra Chilli Megaways",
+  "Floating Dragon",
+  "Reactoonz",
+  "Jammin' Jars",
+  "Bonanza Megaways",
+  "Starburst",
+  "Gonzo's Quest",
+  "Dead or Alive 2",
+  "Razor Shark",
+  "Rise of Olympus",
+  "Mental",
+  "Buffalo King Megaways",
+  "Money Train 2",
+  "Eye of Horus",
+  "Joker's Jewels",
 ];
 
 const USERNAMES = [
-  "CasinoVIP", "LuckyAce", "HighRoller99", "DiamondHands",
-  "MoonWalker", "CryptoKing", "Player777", "GoldRush",
-  "SlotMaster", "BigWinner", "JackpotHunter", "RoyalFlush",
-  "TurboSpin", "WhaleBet", "NeonPlayer", "StarGambler",
-  "BetKing", "ProGamer", "SilverFox", "OceanBet"
+  "Gizli_01", "Oyuncu_42", "Kral_77", "Yildiz_09", "Seker_33",
+  "Altin_55", "Hizli_88", "Deniz_14", "Gece_67", "Bulut_22",
+  "Kartal_91", "Nehir_03", "Ayla_56", "Toprak_78", "Firtina_45",
+  "Celik_19", "Gumus_64", "Ates_37", "Dalga_82", "Kaplan_11",
+  "Bora_53", "Yilmaz_96", "Duman_28", "Elmas_70", "Kurt_15",
+  "Simsek_49", "Pars_86", "Volkan_31", "Aslan_63", "Sahin_07",
 ];
 
 const sseClients = new Set<Response>();
@@ -34,19 +56,134 @@ function broadcastTransaction(tx: object) {
   }
 }
 
+let whaleCooldown = 0;
+const recentUsers: string[] = [];
+const userBetHistory: Map<string, number> = new Map();
+
+function pickNaturalBetAmount(min: number, max: number): number {
+  const raw = min + Math.random() * (max - min);
+
+  if (raw < 20) return Math.round(raw);
+  if (raw < 100) {
+    const rounded = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 80, 100];
+    return rounded.reduce((prev, curr) =>
+      Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev
+    );
+  }
+  if (raw < 500) {
+    const base = Math.round(raw / 25) * 25;
+    const jitter = Math.random() < 0.3 ? Math.round((Math.random() - 0.5) * 20) : 0;
+    return Math.max(25, base + jitter);
+  }
+  if (raw < 2000) {
+    const base = Math.round(raw / 50) * 50;
+    const jitter = Math.random() < 0.25 ? Math.round((Math.random() - 0.5) * 50) : 0;
+    return Math.max(50, base + jitter);
+  }
+  if (raw < 10000) {
+    const base = Math.round(raw / 250) * 250;
+    const jitter = Math.random() < 0.2 ? Math.round((Math.random() - 0.5) * 200) : 0;
+    return Math.max(250, base + jitter);
+  }
+  const base = Math.round(raw / 1000) * 1000;
+  const jitter = Math.random() < 0.15 ? Math.round((Math.random() - 0.5) * 500) : 0;
+  return Math.max(1000, base + jitter);
+}
+
+function generateBetAmount(): number {
+  const roll = Math.random() * 100;
+
+  if (roll < 70) {
+    return pickNaturalBetAmount(5, 250);
+  } else if (roll < 90) {
+    return pickNaturalBetAmount(250, 1500);
+  } else if (roll < 97) {
+    return pickNaturalBetAmount(1500, 7500);
+  } else if (roll < 99.5) {
+    return pickNaturalBetAmount(7500, 25000);
+  } else {
+    if (whaleCooldown > 0) {
+      return pickNaturalBetAmount(1500, 7500);
+    }
+    whaleCooldown = 20 + Math.floor(Math.random() * 21);
+    return pickNaturalBetAmount(25000, 120000);
+  }
+}
+
+function generateOutcome(betAmount: number): { type: "WIN" | "LOSS"; multiplier: string | undefined } {
+  const roll = Math.random() * 100;
+
+  if (roll < 58) {
+    return { type: "LOSS", multiplier: undefined };
+  }
+
+  let multiplier: number;
+
+  if (roll < 90) {
+    multiplier = 1.1 + Math.random() * 2.9;
+  } else if (roll < 98) {
+    multiplier = 4 + Math.random() * 16;
+  } else if (roll < 99.8) {
+    if (betAmount > 5000) {
+      multiplier = 20 + Math.random() * 30;
+    } else {
+      multiplier = 20 + Math.random() * 100;
+    }
+  } else {
+    if (betAmount > 2000) {
+      multiplier = 120 + Math.random() * 80;
+    } else {
+      multiplier = 120 + Math.random() * 880;
+    }
+  }
+
+  const rounded = Math.round(multiplier * 10) / 10;
+  return { type: "WIN", multiplier: `${rounded}x` };
+}
+
+function pickUsername(): string {
+  let candidate: string;
+  let attempts = 0;
+
+  do {
+    candidate = USERNAMES[Math.floor(Math.random() * USERNAMES.length)];
+    attempts++;
+  } while (recentUsers.slice(-2).includes(candidate) && attempts < 10);
+
+  recentUsers.push(candidate);
+  if (recentUsers.length > 10) recentUsers.shift();
+
+  return candidate;
+}
+
+function applyUserBehavior(username: string, baseBet: number): number {
+  const lastBet = userBetHistory.get(username);
+  if (lastBet !== undefined) {
+    const drift = 0.7 + Math.random() * 0.6;
+    const blended = Math.round(lastBet * drift * 0.4 + baseBet * 0.6);
+    userBetHistory.set(username, blended);
+    return blended;
+  }
+  userBetHistory.set(username, baseBet);
+  return baseBet;
+}
+
 function generateMockTransaction() {
-  const isWin = Math.random() > 0.45;
-  const amount = isWin
-    ? (Math.random() > 0.9 ? Math.floor(Math.random() * 50000) + 5000 : Math.floor(Math.random() * 5000) + 10)
-    : Math.floor(Math.random() * 3000) + 10;
+  if (whaleCooldown > 0) whaleCooldown--;
+
+  const username = pickUsername();
+  const rawBet = generateBetAmount();
+  const betAmount = applyUserBehavior(username, rawBet);
+  const finalBet = Math.max(5, betAmount);
+  const outcome = generateOutcome(finalBet);
 
   return {
-    username: USERNAMES[Math.floor(Math.random() * USERNAMES.length)],
-    amount: amount.toFixed(2),
+    username,
+    amount: finalBet.toFixed(2),
     currency: "₺",
-    type: isWin ? "WIN" : "LOSS",
+    type: outcome.type,
     game: CASINO_GAMES[Math.floor(Math.random() * CASINO_GAMES.length)],
-    multiplier: isWin ? `${(Math.random() * 100 + 1).toFixed(1)}x` : undefined,
+    multiplier: outcome.multiplier,
   };
 }
 
@@ -139,27 +276,10 @@ export async function registerRoutes(
 async function seedDatabase() {
   const existing = await storage.getTransactions(1);
   if (existing.length === 0) {
-    console.log("Seeding database...");
-    const seedData = [
-      { username: "CasinoVIP", amount: "25000.00", currency: "₺", type: "WIN", game: "Gates of Olympus", multiplier: "125.5x" },
-      { username: "LuckyAce", amount: "3200.00", currency: "₺", type: "WIN", game: "Sweet Bonanza", multiplier: "32x" },
-      { username: "HighRoller99", amount: "8500.00", currency: "₺", type: "LOSS", game: "Blackjack" },
-      { username: "Player777", amount: "1500.00", currency: "₺", type: "WIN", game: "Aviator", multiplier: "3.2x" },
-      { username: "GoldRush", amount: "450.00", currency: "₺", type: "LOSS", game: "Crash" },
-      { username: "DiamondHands", amount: "12000.00", currency: "₺", type: "WIN", game: "Lightning Roulette", multiplier: "50x" },
-      { username: "SlotMaster", amount: "2100.00", currency: "₺", type: "LOSS", game: "Book of Dead" },
-      { username: "BigWinner", amount: "7800.00", currency: "₺", type: "WIN", game: "Crazy Time", multiplier: "15.6x" },
-      { username: "NeonPlayer", amount: "950.00", currency: "₺", type: "LOSS", game: "Plinko" },
-      { username: "WhaleBet", amount: "35000.00", currency: "₺", type: "WIN", game: "Mines", multiplier: "87.5x" },
-      { username: "ProGamer", amount: "180.00", currency: "₺", type: "WIN", game: "Dice", multiplier: "2.1x" },
-      { username: "StarGambler", amount: "5600.00", currency: "₺", type: "LOSS", game: "Baccarat" },
-      { username: "JackpotHunter", amount: "15500.00", currency: "₺", type: "WIN", game: "Big Bass Bonanza", multiplier: "62x" },
-      { username: "BetKing", amount: "720.00", currency: "₺", type: "WIN", game: "Limbo", multiplier: "4.8x" },
-      { username: "TurboSpin", amount: "3400.00", currency: "₺", type: "LOSS", game: "Monopoly Live" },
-    ];
-    for (const data of seedData) {
-      // @ts-ignore
-      await storage.createTransaction(data);
+    console.log("Seeding database with realistic transactions...");
+    for (let i = 0; i < 20; i++) {
+      const mock = generateMockTransaction();
+      await storage.createTransaction(mock as any);
     }
     console.log("Database seeded!");
   }

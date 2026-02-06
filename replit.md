@@ -23,11 +23,10 @@ Preferred communication style: Simple, everyday language.
 - **Path Aliases**: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
 
 ### Key Frontend Components
-- `LiveFeed` — Main page with CSS Grid casino feed, Casino/Top Kazanclar tabs, SSE-powered real-time updates, auto-scroll to top
-- `TransactionRow` — Responsive grid row with hidden username, game thumbnail, bet amount, multiplier (hidden on mobile), winnings
-- `AdminPanel` — Dialog form to manually create transactions
+- `LiveFeed` — Main page with CSS Grid casino feed, SSE-powered real-time updates, auto-scroll to top, max 40 items
+- `TransactionRow` — Responsive grid row with hidden username ("Gizli"), game thumbnail, bet amount, multiplier (dash for losses, hidden on mobile), winnings
 - `useTransactionStream` — SSE hook for real-time transaction streaming with auto-reconnect
-- Game thumbnail images stored in `client/public/images/games/`
+- Game thumbnail images stored in `client/public/images/games/` (30 unique slot game thumbnails)
 
 ### Responsive Layout
 - Desktop (>=640px): 5-column CSS Grid (Kullanici, Oyun, Bahis, Carpan, Kazanc)
@@ -55,7 +54,16 @@ Preferred communication style: Simple, everyday language.
 - Server generates mock transactions every 1.5s via `setInterval`
 - New transactions are saved to DB and broadcast to all connected SSE clients
 - SSE clients receive JSON transaction objects via `EventSource`
-- Client maintains max 50 items, newest at top, old items dropped from memory
+- Client maintains max 40 items, newest at top, old items dropped from memory
+
+### Realistic Transaction Generation
+- **30 slot games**: Gates of Olympus, Sweet Bonanza, Big Bass Bonanza, Book of Dead, Wolf Gold, Sugar Rush, Starlight Princess, Wanted Dead or a Wild, The Dog House, Fruit Party, Fire Joker, Legacy of Dead, Gates of Gatotkaca, Aztec Gems, Madame Destiny Megaways, Extra Chilli Megaways, Floating Dragon, Reactoonz, Jammin' Jars, Bonanza Megaways, Starburst, Gonzo's Quest, Dead or Alive 2, Razor Shark, Rise of Olympus, Mental, Buffalo King Megaways, Money Train 2, Eye of Horus, Joker's Jewels
+- **Bet distribution** (heavy-tail): 70% ₺5-250, 20% ₺250-1500, 7% ₺1500-7500, 2.5% ₺7500-25000, 0.5% ₺25000-120000 (whale)
+- **Outcome distribution**: 58% loss, 32% small win (1.1-4x), 8% mid win (4-20x), 1.8% big win (20-120x), 0.2% mega win (120-1000x)
+- **Whale cooldown**: 20-40 events between whale-tier bets
+- **User behavior**: Same user won't appear back-to-back; returning users' bet amounts drift gradually (human simulation)
+- **Natural amounts**: Bet values snap to clean numbers (₺50, ₺75, ₺250, ₺2,750) with slight jitter, not random decimals
+- **High-bet restrictions**: Big multipliers (200x+) are very rare on high bets (>₺5,000)
 
 ### Database
 - **Database**: PostgreSQL (required, connected via `DATABASE_URL` environment variable)

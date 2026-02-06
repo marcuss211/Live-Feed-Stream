@@ -4,32 +4,36 @@ import { Users } from "lucide-react";
 import { clsx } from "clsx";
 
 const GAME_IMAGES: Record<string, string> = {
-  "Sweet Bonanza": "/images/games/sweet-bonanza.png",
   "Gates of Olympus": "/images/games/gates-of-olympus.png",
-  "Gates of Olympus 1000": "/images/games/gates-of-olympus.png",
-  "Gates of Olympus Super Scatter": "/images/games/gates-of-olympus.png",
-  "Aviator": "/images/games/aviator.png",
-  "Crash": "/images/games/crash.png",
-  "Roulette": "/images/games/roulette.png",
-  "Lightning Roulette": "/images/games/lightning-roulette.png",
-  "Blackjack": "/images/games/blackjack.png",
-  "Poker": "/images/games/poker.png",
-  "Baccarat": "/images/games/baccarat.png",
-  "Slots": "/images/games/slots.png",
-  "Mines": "/images/games/mines.png",
-  "Plinko": "/images/games/plinko.png",
-  "Dice": "/images/games/dice.png",
-  "Limbo": "/images/games/limbo.png",
+  "Sweet Bonanza": "/images/games/sweet-bonanza.png",
   "Big Bass Bonanza": "/images/games/big-bass-bonanza.png",
   "Book of Dead": "/images/games/book-of-dead.png",
-  "Crazy Time": "/images/games/crazy-time.png",
-  "Monopoly Live": "/images/games/monopoly-live.png",
-  "Dream Catcher": "/images/games/dream-catcher.png",
-  "Mega Ball": "/images/games/mega-ball.png",
-  "40 Burning Hot": "/images/games/burning-hot.png",
-  "Black Seven Bell Link": "/images/games/slots.png",
-  "100 Bulky Dice Golden Coins Link": "/images/games/dice.png",
-  "VIP Flaming Hot Extreme Bell Link": "/images/games/burning-hot.png",
+  "Wolf Gold": "/images/games/wolf-gold.png",
+  "Sugar Rush": "/images/games/sugar-rush.png",
+  "Starlight Princess": "/images/games/starlight-princess.png",
+  "Wanted Dead or a Wild": "/images/games/wanted-dead-or-wild.png",
+  "The Dog House": "/images/games/the-dog-house.png",
+  "Fruit Party": "/images/games/fruit-party.png",
+  "Fire Joker": "/images/games/fire-joker.png",
+  "Legacy of Dead": "/images/games/legacy-of-dead.png",
+  "Gates of Gatotkaca": "/images/games/gates-of-gatotkaca.png",
+  "Aztec Gems": "/images/games/aztec-gems.png",
+  "Madame Destiny Megaways": "/images/games/madame-destiny-megaways.png",
+  "Extra Chilli Megaways": "/images/games/extra-chilli-megaways.png",
+  "Floating Dragon": "/images/games/floating-dragon.png",
+  "Reactoonz": "/images/games/reactoonz.png",
+  "Jammin' Jars": "/images/games/jammin-jars.png",
+  "Bonanza Megaways": "/images/games/bonanza-megaways.png",
+  "Starburst": "/images/games/starburst.png",
+  "Gonzo's Quest": "/images/games/gonzos-quest.png",
+  "Dead or Alive 2": "/images/games/dead-or-alive-2.png",
+  "Razor Shark": "/images/games/razor-shark.png",
+  "Rise of Olympus": "/images/games/rise-of-olympus.png",
+  "Mental": "/images/games/mental.png",
+  "Buffalo King Megaways": "/images/games/buffalo-king-megaways.png",
+  "Money Train 2": "/images/games/money-train-2.png",
+  "Eye of Horus": "/images/games/eye-of-horus.png",
+  "Joker's Jewels": "/images/games/jokers-jewels.png",
 };
 
 function parseMultiplier(m: string | null | undefined): number {
@@ -79,7 +83,7 @@ export const TransactionRow = memo(function TransactionRow({ transaction, isNew 
       <div className="flex items-center gap-1 sm:gap-2 min-w-0 py-2 px-2 sm:px-3">
         <Users className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0 hidden sm:block" />
         <span className="text-xs sm:text-sm text-muted-foreground truncate" data-testid={`text-username-${transaction.id}`}>
-          Hidden
+          Gizli
         </span>
       </div>
 
@@ -104,7 +108,7 @@ export const TransactionRow = memo(function TransactionRow({ transaction, isNew 
 
       <div className="py-2 px-1 sm:px-3 min-w-0 hidden xs:block">
         <span className="text-xs sm:text-sm text-foreground/70 font-mono" data-testid={`text-multiplier-${transaction.id}`}>
-          {multiplier > 0 ? `${multiplier.toFixed(2)}x` : "-"}
+          {isWin && multiplier > 0 ? `${multiplier.toFixed(1)}x` : "\u2013"}
         </span>
       </div>
 

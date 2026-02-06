@@ -1,0 +1,93 @@
+Mevcut leaderboard bileşeninde bulunan “Top Kazançlar” ve “Add Bet” alanları kaldırılacaktır.
+ Amaç: Kullanıcı siteye girdiğinde gerçek oyuncuların oynadığı hissini veren, tamamen gerçekçi bahis dağılımına sahip canlı aktivite feed’i oluşturmaktır.
+
+
+
+Listeye eklenecek slot oyunları (30 adet)
+
+Gates of Olympus
+Sweet Bonanza
+Big Bass Bonanza
+Book of Dead
+Wolf Gold
+Sugar Rush
+Starlight Princess
+Wanted Dead or a Wild
+The Dog House
+Fruit Party
+Fire Joker
+Legacy of Dead
+Gates of Gatotkaca
+Aztec Gems
+Madame Destiny Megaways
+Extra Chilli Megaways
+Floating Dragon
+Reactoonz
+Jammin’ Jars
+Bonanza Megaways
+Starburst
+Gonzo’s Quest
+Dead or Alive 2
+Razor Shark
+Rise of Olympus
+Mental
+Buffalo King Megaways
+Money Train 2
+Eye of Horus
+Joker’s Jewels
+
+Gerçekçi ve maksimalist bahis üretim mantığı
+
+Bahis üretimi heavy-tail distribution kullanacaktır:
+
+%70 → ₺5 – ₺250
+
+%20 → ₺250 – ₺1.500
+
+%7 → ₺1.500 – ₺7.500
+
+%2.5 → ₺7.500 – ₺25.000
+
+%0.5 → ₺25.000 – ₺120.000 (whale)
+
+Kurallar:
+
+Whale bahisler arka arkaya gelmez (20–40 event cooldown).
+
+Aynı kullanıcı birkaç event üst üste görünürse bahis miktarı kademeli değişir (insan davranışı simülasyonu).
+
+Bet değerleri tamamen sabit rakamlar değil, doğal görünen yuvarlak veya yarı-random rakamlar üretir (₺50, ₺75, ₺120, ₺400, ₺800, ₺2.750 vb).
+
+Sonuç dağılımı (gerçekçi casino davranışı)
+
+%58 kayıp
+
+%32 küçük kazanç → 1.1x – 4x
+
+%8 orta kazanç → 4x – 20x
+
+%1.8 büyük kazanç → 20x – 120x
+
+%0.2 çok büyük kazanç → 120x – 1000x
+
+Kurallar:
+
+Büyük çarpanlar çoğunlukla küçük bahislerde görünür.
+
+Yüksek bahislerde 200x+ sonuçlar çok nadir üretilir.
+
+Kayıplarda çarpan alanı “–” olarak gösterilebilir.
+
+Teknik beklenti
+
+WebSocket / interval ile sürekli akan yapı
+
+Yeni kayıt highlight efekti (1–2 sn)
+
+GPU transform animasyonları (translateY) kullanılarak kayma/jitter oluşmaması
+
+Liste uzunluğunda virtualization kullanılması (maks 40 kayıt render)
+
+Component reusable yapı (React/Vue component mantığı)
+
+Amaç: Kullanıcıya gerçek zamanlı casino aktivite hissi veren, mobilde stabil çalışan, psikolojik olarak gerçek oyuncu davranışına en yakın canlı slot aktivite listesi oluşturmak.
