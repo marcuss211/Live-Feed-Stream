@@ -41,16 +41,11 @@ export async function registerRoutes(
 
   app.post(api.transactions.create.path, async (req, res) => {
     try {
-      const input = api.transactions.create.input.parse(req.body);
-      // In a real app, we might check permissions here (e.g. isAdmin)
-      // but for this demo/feed app we'll allow it (or user is logged in via Auth)
-      // Since admin panel is behind auth in frontend (likely), we could add `isAuthenticated` middleware here.
-      // For now, let's keep it open or assume the frontend handles the protection UX, 
-      // but ideally we protect this route.
-      // Note: User didn't strictly ask for protected backend, but "Admin Panel" implies it.
-      // I'll leave it open for now to ensure the seed script and demo works easily, 
-      // but strictly speaking `isAuthenticated` should be here.
-      
+      const body = { ...req.body };
+      if (typeof body.amount === 'number') {
+        body.amount = body.amount.toString();
+      }
+      const input = api.transactions.create.input.parse(body);
       const transaction = await storage.createTransaction(input);
       res.status(201).json(transaction);
     } catch (err) {
@@ -87,11 +82,21 @@ async function seedDatabase() {
   if (existing.length === 0) {
     console.log("Seeding database...");
     const seedData = [
-      { username: "PlayerOne", amount: "500.00", currency: "₺", type: "WIN", game: "Roulette", multiplier: "2x" },
-      { username: "HighRoller", amount: "1250.50", currency: "₺", type: "LOSS", game: "Blackjack" },
-      { username: "Lucky7", amount: "5000.00", currency: "₺", type: "WIN", game: "Slots", multiplier: "50x" },
-      { username: "Newbie", amount: "50.00", currency: "₺", type: "LOSS", game: "Crash" },
-      { username: "WhaleUser", amount: "10000.00", currency: "₺", type: "WIN", game: "Baccarat", multiplier: "1x" },
+      { username: "CasinoVIP", amount: "25000.00", currency: "₺", type: "WIN", game: "Gates of Olympus", multiplier: "125.5x" },
+      { username: "LuckyAce", amount: "3200.00", currency: "₺", type: "WIN", game: "Sweet Bonanza", multiplier: "32x" },
+      { username: "HighRoller99", amount: "8500.00", currency: "₺", type: "LOSS", game: "Blackjack" },
+      { username: "Player777", amount: "1500.00", currency: "₺", type: "WIN", game: "Aviator", multiplier: "3.2x" },
+      { username: "GoldRush", amount: "450.00", currency: "₺", type: "LOSS", game: "Crash" },
+      { username: "DiamondHands", amount: "12000.00", currency: "₺", type: "WIN", game: "Lightning Roulette", multiplier: "50x" },
+      { username: "SlotMaster", amount: "2100.00", currency: "₺", type: "LOSS", game: "Book of Dead" },
+      { username: "BigWinner", amount: "7800.00", currency: "₺", type: "WIN", game: "Crazy Time", multiplier: "15.6x" },
+      { username: "NeonPlayer", amount: "950.00", currency: "₺", type: "LOSS", game: "Plinko" },
+      { username: "WhaleBet", amount: "35000.00", currency: "₺", type: "WIN", game: "Mines", multiplier: "87.5x" },
+      { username: "ProGamer", amount: "180.00", currency: "₺", type: "WIN", game: "Dice", multiplier: "2.1x" },
+      { username: "StarGambler", amount: "5600.00", currency: "₺", type: "LOSS", game: "Baccarat" },
+      { username: "JackpotHunter", amount: "15500.00", currency: "₺", type: "WIN", game: "Big Bass Bonanza", multiplier: "62x" },
+      { username: "BetKing", amount: "720.00", currency: "₺", type: "WIN", game: "Limbo", multiplier: "4.8x" },
+      { username: "TurboSpin", amount: "3400.00", currency: "₺", type: "LOSS", game: "Monopoly Live" },
     ];
 
     for (const data of seedData) {
