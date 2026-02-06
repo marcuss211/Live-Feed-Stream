@@ -52,10 +52,8 @@ export default function LiveFeed() {
   const [activeTab, setActiveTab] = useState<"casino" | "top">("casino");
   const [simulatedTransactions, setSimulatedTransactions] = useState<Transaction[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const autoScrollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const idCounterRef = useRef(100000);
-  const shouldScrollToBottomRef = useRef(true);
 
   const {
     data,
@@ -93,34 +91,17 @@ export default function LiveFeed() {
       idCounterRef.current += 1;
       const newTx = generateMockTransaction(idCounterRef.current);
       setSimulatedTransactions(prev => [...prev, newTx].slice(-80));
-      shouldScrollToBottomRef.current = true;
     }, ms);
 
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (shouldScrollToBottomRef.current && isAutoScrolling && scrollRef.current) {
+    if (isAutoScrolling && scrollRef.current) {
       const container = scrollRef.current;
-      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-      shouldScrollToBottomRef.current = false;
+      container.scrollTop = container.scrollHeight;
     }
   }, [displayTransactions.length, isAutoScrolling]);
-
-  useEffect(() => {
-    const container = scrollRef.current;
-    if (!container || !isAutoScrolling) return;
-
-    autoScrollRef.current = setInterval(() => {
-      if (container.scrollTop < container.scrollHeight - container.clientHeight) {
-        container.scrollTop += 1;
-      }
-    }, 30);
-
-    return () => {
-      if (autoScrollRef.current) clearInterval(autoScrollRef.current);
-    };
-  }, [isAutoScrolling, displayTransactions.length]);
 
   useEffect(() => {
     const container = scrollRef.current;
