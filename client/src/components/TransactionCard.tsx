@@ -1,5 +1,4 @@
-import { motion } from "framer-motion";
-import { forwardRef } from "react";
+import { memo, useState, useEffect } from "react";
 import { type Transaction } from "@shared/schema";
 import { Users } from "lucide-react";
 import { clsx } from "clsx";
@@ -33,12 +32,7 @@ const GAME_IMAGES: Record<string, string> = {
   "VIP Flaming Hot Extreme Bell Link": "/images/games/burning-hot.png",
 };
 
-interface TransactionCardProps {
-  transaction: Transaction;
-  isNew?: boolean;
-}
-
-function parseMultiplier(m: string | null): number {
+function parseMultiplier(m: string | null | undefined): number {
   if (!m) return 0;
   const val = parseFloat(m.replace(/x$/i, ""));
   return isNaN(val) ? 0 : val;
@@ -53,7 +47,13 @@ export function getWinnings(tx: Transaction): number {
   return -bet;
 }
 
-export const TransactionRow = forwardRef<HTMLTableRowElement, TransactionCardProps>(({ transaction, isNew }, ref) => {
+interface TransactionRowProps {
+  transaction: Transaction;
+  isNew?: boolean;
+}
+
+export const TransactionRow = memo(function TransactionRow({ transaction, isNew }: TransactionRowProps) {
+  const [highlight, setHighlight] = useState(isNew);
   const isWin = transaction.type === "WIN";
   const amount = Number(transaction.amount);
   const gameImage = GAME_IMAGES[transaction.game] || "/images/games/slots.png";
@@ -61,57 +61,61 @@ export const TransactionRow = forwardRef<HTMLTableRowElement, TransactionCardPro
   const winnings = getWinnings(transaction);
   const absWinnings = Math.abs(winnings);
 
+  useEffect(() => {
+    if (!isNew) return;
+    const t = setTimeout(() => setHighlight(false), 1800);
+    return () => clearTimeout(t);
+  }, [isNew]);
+
   return (
-    <motion.tr
-      ref={ref as any}
-      initial={isNew ? { opacity: 0, y: 20 } : { opacity: 0 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="border-b border-border/30 hover-elevate"
+    <div
+      className={clsx(
+        "feed-row grid items-center border-b border-border/30 will-change-transform",
+        isNew && "feed-row-enter",
+        highlight && "feed-row-highlight"
+      )}
       data-testid={`row-transaction-${transaction.id}`}
     >
-      <td className="py-2 px-2 sm:py-2.5 sm:px-4">
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground/60 flex-shrink-0" />
-          <span className="text-xs sm:text-sm text-muted-foreground" data-testid={`text-username-${transaction.id}`}>
-            Hidden
-          </span>
-        </div>
-      </td>
-      <td className="py-2 px-2 sm:py-2.5 sm:px-4">
-        <div className="flex items-center gap-1.5 sm:gap-2.5">
-          <img
-            src={gameImage}
-            alt={transaction.game}
-            className="w-6 h-6 sm:w-8 sm:h-8 rounded-md object-cover flex-shrink-0"
-            data-testid={`img-game-${transaction.id}`}
-          />
-          <span className="text-xs sm:text-sm font-medium text-foreground truncate" data-testid={`text-game-${transaction.id}`}>
-            {transaction.game}
-          </span>
-        </div>
-      </td>
-      <td className="py-2 px-2 sm:py-2.5 sm:px-4">
-        <span className="text-xs sm:text-sm text-foreground/80 font-mono" data-testid={`text-bet-amount-${transaction.id}`}>
+      <div className="flex items-center gap-1 sm:gap-2 min-w-0 py-2 px-2 sm:px-3">
+        <Users className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0 hidden sm:block" />
+        <span className="text-xs sm:text-sm text-muted-foreground truncate" data-testid={`text-username-${transaction.id}`}>
+          Hidden
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0 py-2 px-1 sm:px-3">
+        <img
+          src={gameImage}
+          alt={transaction.game}
+          className="w-6 h-6 sm:w-8 sm:h-8 rounded-md object-cover flex-shrink-0"
+          loading="lazy"
+          data-testid={`img-game-${transaction.id}`}
+        />
+        <span className="text-xs sm:text-sm font-medium text-foreground truncate" data-testid={`text-game-${transaction.id}`}>
+          {transaction.game}
+        </span>
+      </div>
+
+      <div className="py-2 px-1 sm:px-3 min-w-0">
+        <span className="text-xs sm:text-sm text-foreground/80 font-mono truncate block" data-testid={`text-bet-amount-${transaction.id}`}>
           {transaction.currency}{amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
-      </td>
-      <td className="py-2 px-2 sm:py-2.5 sm:px-4">
+      </div>
+
+      <div className="py-2 px-1 sm:px-3 min-w-0 hidden xs:block">
         <span className="text-xs sm:text-sm text-foreground/70 font-mono" data-testid={`text-multiplier-${transaction.id}`}>
-          {multiplier > 0 ? `${multiplier.toFixed(2)}x` : "0.00x"}
+          {multiplier > 0 ? `${multiplier.toFixed(2)}x` : "-"}
         </span>
-      </td>
-      <td className="py-2 px-2 sm:py-2.5 sm:px-4 text-right">
+      </div>
+
+      <div className="py-2 px-1 sm:px-3 text-right min-w-0">
         <span className={clsx(
           "text-xs sm:text-sm font-semibold font-mono",
           isWin ? "text-green-400" : "text-red-400"
         )} data-testid={`text-amount-${transaction.id}`}>
           {isWin ? "+" : "-"}{transaction.currency}{absWinnings.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
-      </td>
-    </motion.tr>
+      </div>
+    </div>
   );
 });
-
-TransactionRow.displayName = "TransactionRow";

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a **casino transaction live feed** application — a real-time dashboard that displays casino win/loss transactions with a scrolling ticker, stats bar, admin panel for creating transactions, and a simulation mode for generating mock data. The app tracks casino bets (wins and losses) with details like username, amount, game, multiplier, and currency (Turkish Lira ₺). It features a dark-themed UI optimized for monitoring casino activity.
+This is a **casino transaction live feed** application — a real-time dashboard that displays casino win/loss transactions via Server-Sent Events (SSE). The server auto-generates mock transactions every 1.5s and broadcasts them in real-time. The app tracks casino bets (wins and losses) with details like username, amount, game, multiplier, and currency (Turkish Lira ₺). It features a dark-themed UI optimized for monitoring casino activity with GPU-accelerated CSS animations and fully responsive mobile support.
 
 ## User Preferences
 
@@ -16,17 +16,25 @@ Preferred communication style: Simple, everyday language.
 - **State/Data Fetching**: TanStack React Query with infinite query support for cursor-based pagination
 - **Styling**: Tailwind CSS with CSS variables for theming (dark mode by default)
 - **UI Components**: shadcn/ui (new-york style) built on Radix UI primitives
-- **Animations**: Framer Motion for transaction card enter/exit animations
+- **Animations**: CSS-only GPU-accelerated animations (translateY, will-change-transform) for 60fps feed transitions
+- **Real-time**: Server-Sent Events (SSE) via EventSource for live transaction streaming
 - **Forms**: React Hook Form with Zod validation via @hookform/resolvers
 - **Build Tool**: Vite with React plugin
 - **Path Aliases**: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
 
 ### Key Frontend Components
-- `LiveFeed` — Main page with table-style casino feed, Casino/Top Kazanclar tabs, auto-scroll
-- `TransactionRow` — Table row for each transaction (Hidden username, game thumbnail, bet amount, multiplier, winnings)
+- `LiveFeed` — Main page with CSS Grid casino feed, Casino/Top Kazanclar tabs, SSE-powered real-time updates, auto-scroll to top
+- `TransactionRow` — Responsive grid row with hidden username, game thumbnail, bet amount, multiplier (hidden on mobile), winnings
 - `AdminPanel` — Dialog form to manually create transactions
-- `SimulationControl` — Client-side mock transaction generator for demo purposes
+- `useTransactionStream` — SSE hook for real-time transaction streaming with auto-reconnect
 - Game thumbnail images stored in `client/public/images/games/`
+
+### Responsive Layout
+- Desktop (>=640px): 5-column CSS Grid (Kullanici, Oyun, Bahis, Carpan, Kazanc)
+- Mobile (480-639px): 4-column CSS Grid (Carpan hidden)
+- Small mobile (<480px): 4-column CSS Grid with narrower columns
+- No horizontal scroll on any viewport — columns auto-narrow
+- Text, padding, images scale down on mobile via sm: breakpoints
 
 ### Backend
 - **Framework**: Express.js on Node.js with TypeScript
@@ -38,9 +46,16 @@ Preferred communication style: Simple, everyday language.
 
 ### API Endpoints
 - `GET /api/transactions` — List transactions with cursor-based pagination, optional type/search filters
-- `POST /api/transactions` — Create a new transaction
+- `POST /api/transactions` — Create a new transaction (also broadcasts via SSE)
+- `GET /api/transactions/stream` — SSE endpoint for real-time transaction streaming
 - `GET /api/stats` — Get aggregated profit/loss statistics
 - `GET /api/auth/user` — Get authenticated user info
+
+### Real-time Data Flow
+- Server generates mock transactions every 1.5s via `setInterval`
+- New transactions are saved to DB and broadcast to all connected SSE clients
+- SSE clients receive JSON transaction objects via `EventSource`
+- Client maintains max 50 items, newest at top, old items dropped from memory
 
 ### Database
 - **Database**: PostgreSQL (required, connected via `DATABASE_URL` environment variable)

@@ -1,41 +1,76 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
 
+const CASINO_GAMES = [
+  "Sweet Bonanza", "Gates of Olympus", "Gates of Olympus 1000",
+  "Gates of Olympus Super Scatter", "Aviator", "Crash",
+  "Roulette", "Blackjack", "Poker", "Baccarat", "Slots",
+  "Mines", "Plinko", "Dice", "Limbo", "Big Bass Bonanza",
+  "Book of Dead", "Crazy Time", "Lightning Roulette",
+  "Monopoly Live", "Dream Catcher", "Mega Ball",
+  "40 Burning Hot", "Black Seven Bell Link",
+  "100 Bulky Dice Golden Coins Link",
+  "VIP Flaming Hot Extreme Bell Link"
+];
+
+const USERNAMES = [
+  "CasinoVIP", "LuckyAce", "HighRoller99", "DiamondHands",
+  "MoonWalker", "CryptoKing", "Player777", "GoldRush",
+  "SlotMaster", "BigWinner", "JackpotHunter", "RoyalFlush",
+  "TurboSpin", "WhaleBet", "NeonPlayer", "StarGambler",
+  "BetKing", "ProGamer", "SilverFox", "OceanBet"
+];
+
+const sseClients = new Set<Response>();
+
+function broadcastTransaction(tx: object) {
+  const data = `data: ${JSON.stringify(tx)}\n\n`;
+  for (const client of sseClients) {
+    client.write(data);
+  }
+}
+
+function generateMockTransaction() {
+  const isWin = Math.random() > 0.45;
+  const amount = isWin
+    ? (Math.random() > 0.9 ? Math.floor(Math.random() * 50000) + 5000 : Math.floor(Math.random() * 5000) + 10)
+    : Math.floor(Math.random() * 3000) + 10;
+
+  return {
+    username: USERNAMES[Math.floor(Math.random() * USERNAMES.length)],
+    amount: amount.toFixed(2),
+    currency: "₺",
+    type: isWin ? "WIN" : "LOSS",
+    game: CASINO_GAMES[Math.floor(Math.random() * CASINO_GAMES.length)],
+    multiplier: isWin ? `${(Math.random() * 100 + 1).toFixed(1)}x` : undefined,
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup Auth
   await setupAuth(app);
   registerAuthRoutes(app);
 
-  // --- Transactions API ---
-
   app.get(api.transactions.list.path, async (req, res) => {
     try {
-      // Validate query params using the schema
       const query = api.transactions.list.input?.parse(req.query) || {};
-      
       const transactions = await storage.getTransactions(
         query.limit || 50,
         query.cursor,
         query.type,
         query.search
       );
-      
       const nextCursor = transactions.length > 0 ? transactions[transactions.length - 1].id : undefined;
-      
-      res.json({
-        items: transactions,
-        nextCursor
-      });
+      res.json({ items: transactions, nextCursor });
     } catch (error) {
-       console.error("List transactions error:", error);
-       res.status(500).json({ message: "Internal server error" });
+      console.error("List transactions error:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -47,6 +82,7 @@ export async function registerRoutes(
       }
       const input = api.transactions.create.input.parse(body);
       const transaction = await storage.createTransaction(input);
+      broadcastTransaction(transaction);
       res.status(201).json(transaction);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -71,8 +107,31 @@ export async function registerRoutes(
     }
   });
 
-  // Seed data if empty
+  app.get("/api/transactions/stream", (req, res) => {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    res.write("data: {\"type\":\"connected\"}\n\n");
+    sseClients.add(res);
+    req.on("close", () => {
+      sseClients.delete(res);
+    });
+  });
+
   await seedDatabase();
+
+  setInterval(async () => {
+    try {
+      const mock = generateMockTransaction();
+      const tx = await storage.createTransaction(mock as any);
+      broadcastTransaction(tx);
+    } catch (e) {
+      // ignore
+    }
+  }, 1500);
 
   return httpServer;
 }
@@ -98,10 +157,9 @@ async function seedDatabase() {
       { username: "BetKing", amount: "720.00", currency: "₺", type: "WIN", game: "Limbo", multiplier: "4.8x" },
       { username: "TurboSpin", amount: "3400.00", currency: "₺", type: "LOSS", game: "Monopoly Live" },
     ];
-
     for (const data of seedData) {
-      // @ts-ignore - amount string/number casting handled by driver mostly, but we defined decimal in schema
-      await storage.createTransaction(data); 
+      // @ts-ignore
+      await storage.createTransaction(data);
     }
     console.log("Database seeded!");
   }

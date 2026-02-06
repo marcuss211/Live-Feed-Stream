@@ -1,149 +1,91 @@
 import { useTransactions } from "@/hooks/use-transactions";
+import { useTransactionStream } from "@/hooks/use-sse";
 import { TransactionRow, getWinnings } from "@/components/TransactionCard";
 import { AdminPanel } from "@/components/AdminPanel";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { type Transaction } from "@shared/schema";
-import { AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const MAX_FEED_ITEMS = 200;
-
-const CASINO_GAMES = [
-  "Sweet Bonanza", "Gates of Olympus", "Gates of Olympus 1000",
-  "Gates of Olympus Super Scatter", "Aviator", "Crash",
-  "Roulette", "Blackjack", "Poker", "Baccarat", "Slots",
-  "Mines", "Plinko", "Dice", "Limbo", "Big Bass Bonanza",
-  "Book of Dead", "Crazy Time", "Lightning Roulette",
-  "Monopoly Live", "Dream Catcher", "Mega Ball",
-  "40 Burning Hot", "Black Seven Bell Link",
-  "100 Bulky Dice Golden Coins Link",
-  "VIP Flaming Hot Extreme Bell Link"
-];
-
-const USERNAMES = [
-  "CasinoVIP", "LuckyAce", "HighRoller99", "DiamondHands",
-  "MoonWalker", "CryptoKing", "Player777", "GoldRush",
-  "SlotMaster", "BigWinner", "JackpotHunter", "RoyalFlush",
-  "TurboSpin", "WhaleBet", "NeonPlayer", "StarGambler",
-  "BetKing", "ProGamer", "SilverFox", "OceanBet"
-];
-
-function generateMockTransaction(id: number): Transaction {
-  const isWin = Math.random() > 0.45;
-  const amount = isWin
-    ? (Math.random() > 0.9 ? Math.floor(Math.random() * 50000) + 5000 : Math.floor(Math.random() * 5000) + 10)
-    : Math.floor(Math.random() * 3000) + 10;
-
-  return {
-    id,
-    username: USERNAMES[Math.floor(Math.random() * USERNAMES.length)],
-    amount: amount.toFixed(2),
-    currency: "₺",
-    type: isWin ? "WIN" : "LOSS",
-    game: CASINO_GAMES[Math.floor(Math.random() * CASINO_GAMES.length)],
-    multiplier: isWin ? `${(Math.random() * 100 + 1).toFixed(1)}x` : null,
-    timestamp: new Date(),
-    isSimulation: true,
-  };
-}
+const MAX_FEED_ITEMS = 50;
 
 export default function LiveFeed() {
   const [activeTab, setActiveTab] = useState<"casino" | "top">("casino");
-  const [simulatedTransactions, setSimulatedTransactions] = useState<Transaction[]>([]);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [streamedTransactions, setStreamedTransactions] = useState<Transaction[]>([]);
+  const feedRef = useRef<HTMLDivElement>(null);
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
-  const idCounterRef = useRef(100000);
+  const newIdsRef = useRef<Set<number>>(new Set());
 
   const {
     data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
     isLoading
-  } = useTransactions({ limit: 50 });
+  } = useTransactions({ limit: 30 });
+
+  const handleNewTransaction = useCallback((tx: Transaction) => {
+    newIdsRef.current.add(tx.id);
+    setTimeout(() => newIdsRef.current.delete(tx.id), 3000);
+    setStreamedTransactions(prev => {
+      const next = [tx, ...prev];
+      if (next.length > MAX_FEED_ITEMS) next.length = MAX_FEED_ITEMS;
+      return next;
+    });
+  }, []);
+
+  useTransactionStream(handleNewTransaction);
 
   const allTransactions = useMemo(() => {
     const realTx = data?.pages.flatMap(page => page.items) || [];
-    const combined = [...simulatedTransactions, ...realTx];
+    const combined = [...streamedTransactions, ...realTx];
     const seen = new Set<number>();
     const deduped = combined.filter(tx => {
       if (seen.has(tx.id)) return false;
       seen.add(tx.id);
       return true;
     });
-    deduped.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    return deduped.slice(-MAX_FEED_ITEMS);
-  }, [data, simulatedTransactions]);
+    deduped.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return deduped.slice(0, MAX_FEED_ITEMS);
+  }, [data, streamedTransactions]);
 
   const topWinners = useMemo(() => {
     return [...allTransactions]
-      .filter(tx => tx.type === "WIN")
+      .filter(tx => tx.type === "WIN" && getWinnings(tx) > 0)
       .sort((a, b) => getWinnings(b) - getWinnings(a))
-      .slice(0, 50);
+      .slice(0, MAX_FEED_ITEMS);
   }, [allTransactions]);
 
   const displayTransactions = activeTab === "casino" ? allTransactions : topWinners;
 
   useEffect(() => {
-    const ms = 1200;
-    const interval = setInterval(() => {
-      idCounterRef.current += 1;
-      const newTx = generateMockTransaction(idCounterRef.current);
-      setSimulatedTransactions(prev => [...prev, newTx].slice(-80));
-    }, ms);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (isAutoScrolling && scrollRef.current) {
-      const container = scrollRef.current;
-      container.scrollTop = container.scrollHeight;
+    if (isAutoScrolling && feedRef.current && activeTab === "casino") {
+      feedRef.current.scrollTop = 0;
     }
-  }, [displayTransactions.length, isAutoScrolling]);
+  }, [streamedTransactions.length, isAutoScrolling, activeTab]);
 
   useEffect(() => {
-    const container = scrollRef.current;
+    const container = feedRef.current;
     if (!container) return;
 
     let userScrollTimeout: ReturnType<typeof setTimeout>;
-    const handleWheel = () => {
+    const handleInteraction = () => {
       setIsAutoScrolling(false);
       clearTimeout(userScrollTimeout);
       userScrollTimeout = setTimeout(() => setIsAutoScrolling(true), 5000);
     };
 
-    container.addEventListener('wheel', handleWheel);
-    container.addEventListener('touchstart', handleWheel);
+    container.addEventListener('wheel', handleInteraction, { passive: true });
+    container.addEventListener('touchstart', handleInteraction, { passive: true });
     return () => {
-      container.removeEventListener('wheel', handleWheel);
-      container.removeEventListener('touchstart', handleWheel);
+      container.removeEventListener('wheel', handleInteraction);
+      container.removeEventListener('touchstart', handleInteraction);
       clearTimeout(userScrollTimeout);
     };
   }, []);
 
-  useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      const { scrollTop } = container;
-      if (scrollTop < 100) {
-        if (hasNextPage && !isFetchingNextPage) {
-          fetchNextPage();
-        }
-      }
-    };
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-
   return (
-    <div className="h-screen flex flex-col bg-background" data-testid="live-feed-page">
-      <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col px-2 sm:px-4 py-3 sm:py-6 overflow-hidden">
-        <div className="flex items-center justify-between gap-2 sm:gap-4 mb-3 sm:mb-4 flex-wrap">
-          <div className="flex items-center bg-card rounded-lg p-1 border border-border/50" data-testid="tab-container">
+    <div className="h-[100dvh] flex flex-col bg-background" data-testid="live-feed-page">
+      <div className="max-w-6xl mx-auto w-full flex-1 flex flex-col px-2 sm:px-4 py-2 sm:py-4 overflow-hidden">
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3">
+          <div className="flex items-center bg-card rounded-md p-0.5 sm:p-1 border border-border/50" data-testid="tab-container">
             <Button
               variant={activeTab === "casino" ? "default" : "ghost"}
               size="sm"
@@ -167,84 +109,50 @@ export default function LiveFeed() {
           <AdminPanel />
         </div>
 
-        <div className="flex-1 overflow-hidden rounded-lg border border-border/40">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px]" data-testid="transaction-table">
-              <thead className="sticky top-0 z-20">
-                <tr className="bg-card/80 backdrop-blur-sm border-b border-border/50">
-                  <th className="text-left text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 sm:py-3 px-2 sm:px-4 w-[14%]" data-testid="th-user">
-                    Kullanici
-                  </th>
-                  <th className="text-left text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 sm:py-3 px-2 sm:px-4 w-[30%]" data-testid="th-game">
-                    Oyun
-                  </th>
-                  <th className="text-left text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 sm:py-3 px-2 sm:px-4 w-[18%]" data-testid="th-bet">
-                    Bahis Miktari
-                  </th>
-                  <th className="text-left text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 sm:py-3 px-2 sm:px-4 w-[14%]" data-testid="th-multiplier">
-                    Carpan
-                  </th>
-                  <th className="text-right text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 sm:py-3 px-2 sm:px-4 w-[24%]" data-testid="th-winnings">
-                    Kazanc
-                  </th>
-                </tr>
-              </thead>
-            </table>
+        <div className="flex-1 overflow-hidden rounded-md border border-border/40 flex flex-col">
+          <div className="feed-header grid items-center bg-card/80 backdrop-blur-sm border-b border-border/50 sticky top-0 z-20">
+            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-2 sm:px-3" data-testid="th-user">
+              Kullanici
+            </div>
+            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-1 sm:px-3" data-testid="th-game">
+              Oyun
+            </div>
+            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-1 sm:px-3" data-testid="th-bet">
+              Bahis
+            </div>
+            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-1 sm:px-3 hidden xs:block" data-testid="th-multiplier">
+              Carpan
+            </div>
+            <div className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider py-2 px-1 sm:px-3 text-right" data-testid="th-winnings">
+              Kazanc
+            </div>
           </div>
 
           <div
-            ref={scrollRef}
-            className="overflow-y-auto overflow-x-auto scrollbar-hide"
-            style={{ height: 'calc(100% - 41px)' }}
+            ref={feedRef}
+            className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide overscroll-contain"
             data-testid="feed-scroll-container"
           >
-            <table className="w-full min-w-[500px]">
-              <colgroup>
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '30%' }} />
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '14%' }} />
-                <col style={{ width: '24%' }} />
-              </colgroup>
-              <tbody>
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-20">
-                      <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                        <p className="text-sm" data-testid="text-loading">Feed yukleniyor...</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : displayTransactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-20">
-                      <p className="text-sm text-muted-foreground" data-testid="text-empty-state">
-                        Islem bulunamadi.
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  <AnimatePresence initial={false}>
-                    {displayTransactions.map((tx) => (
-                      <TransactionRow
-                        key={tx.id}
-                        transaction={tx}
-                        isNew={tx.isSimulation === true}
-                      />
-                    ))}
-                  </AnimatePresence>
-                )}
-
-                {isFetchingNextPage && (
-                  <tr>
-                    <td colSpan={5} className="py-4 text-center">
-                      <Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" />
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            {isLoading ? (
+              <div className="flex flex-col items-center gap-3 text-muted-foreground py-20">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <p className="text-sm" data-testid="text-loading">Feed yukleniyor...</p>
+              </div>
+            ) : displayTransactions.length === 0 ? (
+              <div className="text-center py-20">
+                <p className="text-sm text-muted-foreground" data-testid="text-empty-state">
+                  Islem bulunamadi.
+                </p>
+              </div>
+            ) : (
+              displayTransactions.map((tx) => (
+                <TransactionRow
+                  key={tx.id}
+                  transaction={tx}
+                  isNew={newIdsRef.current.has(tx.id)}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>
