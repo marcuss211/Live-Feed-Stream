@@ -180,7 +180,85 @@ Ilk giris yapan kullanici otomatik olarak SuperAdmin olur.
 
 ---
 
-## 9. Oyun Gorselleri
+## 9. Admin Paneli Kullanim Kilavuzu
+
+### Admin Paneline Erisim
+
+1. Tarayicidan `http://SITE_ADRESI/admin` adresine gidin
+2. "Giris Yap" butonuna tiklayin ve kimlik dogrulamasi yapin
+3. Ilk giris yapan kullanici otomatik olarak **SuperAdmin** olur
+4. Diger kullanicilar varsayilan olarak **User** rolundedir ve admin paneline erisimleri yoktur
+
+### Kullanici Rollerini Yonetme (Sadece SuperAdmin)
+
+1. Admin panelinde **"Rol Yonetimi"** bolumune gidin
+2. Kullanicinin e-posta adresini girin
+3. Atamak istediginiz rolu secin:
+   - **SuperAdmin** — Tum ayarlara ve yonetime tam erisim
+   - **ContentManager** — Oyun ekleme, duzenleme, silme ve gorsel yukleme yetkisi
+   - **User** — Admin paneline erisim yok
+4. "Kaydet" ile onaylayin
+
+### Oyun Yonetimi
+
+#### Yeni Oyun Ekleme
+1. Admin panelinde **"Yeni Oyun Ekle"** butonuna tiklayin
+2. Acilan formda su alanlari doldurun:
+   - **Oyun Adi**: Ornek: "Gates of Olympus"
+   - **Saglayici (Provider)**: Ornek: "Pragmatic Play"
+   - **Slug**: Oyun adini girince otomatik olusur (ornek: "gates-of-olympus")
+   - **Gorsel**: 256x256 piksel, PNG/JPG/WebP, maksimum 300KB
+   - **Aktif/Pasif**: Oyunun feed'de gorunup gorunmeyecegi
+   - **Bahis Merdiveni (Ladder)**: Pragmatic, Play'n GO, NetEnt, Hacksaw veya Custom
+3. Custom ladder secerseniz, en az 5 deger girin, artan sirada, koseli parantez formatinda: `[1,2,5,10,25,50,100]`
+4. **"Olustur"** butonuna tiklayin
+
+#### Oyun Duzenleme
+1. Oyun listesinde duzenlemek istediginiz oyunun satirini bulun
+2. Degistirmek istediginiz alani guncelleyin (ad, saglayici, aktif/pasif, ladder)
+3. Degisiklikler otomatik kaydedilir ve basarili olunca **"Updated"** etiketi belirir
+4. Degisiklikler aninda canli feed'e yansir — sunucu yeniden baslatma gerekmez
+
+#### Oyun Gorseli Yukleme / Degistirme
+1. Oyun satirinda gorsel alanina tiklayin veya "Yukle" butonunu kullanin
+2. Dosya secin (256x256px, PNG/JPG/WebP, max 300KB)
+3. Yukleme basarili olunca gorsel aninda guncellenir
+4. Eski gorsel dosyasi otomatik olarak sunucudan silinir
+
+#### Oyun Silme
+1. Oyun satirindaki **cop kutusu (trash)** ikonuna tiklayin
+2. Uyari mesaji cikacaktir: _"Bu oyunu silmek istedigine emin misin? Silinen oyun feed'de bir daha gorunmez. Istersen pasif yapmayi da tercih edebilirsin."_
+3. **"Iptal"** ile vazgecebilir veya **"Sil"** ile onaylayabilirsiniz
+4. Silinen oyun veritabaninda kalir ama hicbir yerde gosterilmez (soft-delete)
+5. Silmek yerine sadece **pasif** yapmak isterseniz, oyunun "Aktif" ayarini kapatmaniz yeterlidir
+
+### Feed Ayarlari (Sadece SuperAdmin)
+
+1. Admin panelinde **"Ayarlar"** bolumune gidin
+2. Saglayici agirliklarini (provider weights) ayarlayin — hangi saglayicinin feed'de ne siklikta gorunecegini belirler
+3. Diger feed parametrelerini duzenleyin
+4. **"Kaydet"** ile onaylayin
+
+### Denetim Kayitlari (Audit Logs)
+
+- Admin panelinde yapilan her degisiklik otomatik olarak kaydedilir
+- Kayitlarda su bilgiler yer alir: tarih/saat, degisikligi yapan admin, degisen alan, eski deger, yeni deger
+- Bu kayitlar **"Denetim Kayitlari"** bolumunden goruntulenebelir
+
+---
+
+## 10. Canli Feed Sayfasi
+
+- Ana sayfa (`/`) canli islem akisini gosterir
+- Her 1.5 saniyede yeni islemler otomatik olarak eklenir
+- Ekranda en fazla 40 islem gosterilir, en yeniler ustte yer alir
+- Masaustu gorunumde 5 sutun: Kullanici, Oyun, Bahis, Carpan, Kazanc
+- Mobil gorunumde (480px alti) 4 sutun: Carpan sutunu gizlenir
+- Islem turleri: Kayip (kirmizi) ve Kazanc (yesil) renkleriyle ayirt edilir
+
+---
+
+## 12. Oyun Gorselleri
 
 - Konum: `client/public/images/games/`
 - Boyut: 256x256 piksel onerilir
@@ -190,7 +268,7 @@ Ilk giris yapan kullanici otomatik olarak SuperAdmin olur.
 
 ---
 
-## 10. Onemli Notlar
+## 13. Onemli Notlar
 
 - Sunucu her 1.5 saniyede bir sahte islem uretir (demo amacli). Gercek veriyle calistirmak icin `server/routes.ts` dosyasindaki `setInterval` blogu kaldirilmalidir.
 - Soft-delete: Silinen oyunlar veritabaninda kalir ama `is_deleted=true` olarak isaretlenir ve hicbir yerde gosterilmez.
